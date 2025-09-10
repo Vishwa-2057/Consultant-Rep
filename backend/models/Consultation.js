@@ -195,6 +195,16 @@ consultationSchema.virtual('isOverdue').get(function() {
   return this.consultationDateTime < new Date() && this.status === 'Scheduled';
 });
 
+// Virtual for total prescriptions
+consultationSchema.virtual('totalPrescriptions').get(function() {
+  return this.prescriptions.length;
+});
+
+// Virtual for total lab tests
+consultationSchema.virtual('totalLabTests').get(function() {
+  return this.labTests.length;
+});
+
 // Indexes for better query performance
 consultationSchema.index({ patientId: 1 });
 consultationSchema.index({ date: 1 });

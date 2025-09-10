@@ -50,71 +50,105 @@ const invoiceSchema = new mongoose.Schema({
     quantity: {
       type: Number,
       required: [true, 'Quantity is required'],
-      min: [1, 'Quantity must be at least 1']
+      min: [0.01, 'Quantity must be greater than 0']
     },
-    unitPrice: {
+    rate: {
       type: Number,
-      required: [true, 'Unit price is required'],
-      min: [0, 'Unit price cannot be negative']
+      required: [true, 'Rate is required'],
+      min: [0, 'Rate must be greater than or equal to 0']
     },
-    total: {
+    amount: {
       type: Number,
-      required: [true, 'Total is required'],
-      min: [0, 'Total cannot be negative']
+      required: [true, 'Amount is required'],
+      min: [0, 'Amount must be greater than or equal to 0']
     }
   }],
   
-  // Financial Information
+  // Financial Calculations
   subtotal: {
     type: Number,
     required: [true, 'Subtotal is required'],
-    min: [0, 'Subtotal cannot be negative']
+    min: [0, 'Subtotal must be greater than or equal to 0']
   },
   taxRate: {
     type: Number,
     default: 0,
-    min: [0, 'Tax rate cannot be negative'],
-    max: [100, 'Tax rate cannot exceed 100%']
+    min: [0, 'Tax rate must be greater than or equal to 0'],
+    max: [100, 'Tax rate cannot exceed 100']
   },
   taxAmount: {
     type: Number,
     default: 0,
-    min: [0, 'Tax amount cannot be negative']
+    min: [0, 'Tax amount must be greater than or equal to 0']
+  },
+  discountRate: {
+    type: Number,
+    default: 0,
+    min: [0, 'Discount rate must be greater than or equal to 0'],
+    max: [100, 'Discount rate cannot exceed 100']
   },
   discountAmount: {
     type: Number,
     default: 0,
-    min: [0, 'Discount amount cannot be negative']
+    min: [0, 'Discount amount must be greater than or equal to 0']
   },
-  totalAmount: {
+  total: {
     type: Number,
-    required: [true, 'Total amount is required'],
-    min: [0, 'Total amount cannot be negative']
+    required: [true, 'Total is required'],
+    min: [0, 'Total must be greater than or equal to 0']
   },
   
   // Payment Information
-  paymentStatus: {
-    type: String,
-    enum: ['Unpaid', 'Partial', 'Paid', 'Refunded'],
-    default: 'Unpaid'
-  },
   paymentMethod: {
     type: String,
-    enum: ['Cash', 'Credit Card', 'Debit Card', 'Check', 'Bank Transfer', 'Insurance'],
-    trim: true
+    enum: ['Cash', 'Check', 'Credit Card', 'Debit Card', 'Insurance', 'Other'],
+    default: 'Other'
   },
   paymentDate: {
     type: Date
   },
-  paidAmount: {
-    type: Number,
-    default: 0,
-    min: [0, 'Paid amount cannot be negative']
+  paymentReference: {
+    type: String,
+    trim: true
   },
-  balanceAmount: {
-    type: Number,
-    default: 0,
-    min: [0, 'Balance amount cannot be negative']
+  partialPayments: [{
+    amount: {
+      type: Number,
+      required: true,
+      min: [0.01, 'Payment amount must be greater than 0']
+    },
+    date: {
+      type: Date,
+      default: Date.now
+    },
+    method: {
+      type: String,
+      trim: true
+    },
+    reference: {
+      type: String,
+      trim: true
+    }
+  }],
+  
+  // Insurance Information
+  insurance: {
+    provider: {
+      type: String,
+      trim: true
+    },
+    policyNumber: {
+      type: String,
+      trim: true
+    },
+    groupNumber: {
+      type: String,
+      trim: true
+    },
+    coverage: {
+      type: Number,
+      min: [0, 'Coverage must be greater than or equal to 0']
+    }
   },
   
   // Notes and Additional Information
@@ -144,73 +178,80 @@ const invoiceSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
+// Virtual for remaining balance
+invoiceSchema.virtual('remainingBalance').get(function() {
+  if (this.status === 'Paid') return 0;
+  
+  const totalPaid = this.partialPayments.reduce((sum, payment) => sum + payment.amount, 0);
+  return Math.max(0, this.total - totalPaid);
+});
+
 // Virtual for is overdue
 invoiceSchema.virtual('isOverdue').get(function() {
-  return this.dueDate < new Date() && this.status !== 'Paid' && this.status !== 'Cancelled';
+  if (this.status === 'Paid' || this.status === 'Cancelled') return false;
+  return new Date() > this.dueDate;
 });
 
 // Virtual for days overdue
 invoiceSchema.virtual('daysOverdue').get(function() {
   if (!this.isOverdue) return 0;
-  const today = new Date();
-  const diffTime = today - this.dueDate;
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const now = new Date();
+  const due = this.dueDate;
+  const diffTime = Math.abs(now - due);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
 });
 
-// Pre-save middleware to calculate totals
+// Virtual for payment status
+invoiceSchema.virtual('paymentStatus').get(function() {
+  if (this.status === 'Paid') return 'Paid';
+  if (this.status === 'Cancelled') return 'Cancelled';
+  
+  const remaining = this.remainingBalance;
+  if (remaining === 0) return 'Paid';
+  if (remaining === this.total) return 'Unpaid';
+  return 'Partially Paid';
+});
+
+// Pre-save middleware to calculate amounts
 invoiceSchema.pre('save', function(next) {
+  // Calculate item amounts
+  this.items.forEach(item => {
+    item.amount = item.quantity * item.rate;
+  });
+  
   // Calculate subtotal
-  this.subtotal = this.items.reduce((sum, item) => sum + item.total, 0);
+  this.subtotal = this.items.reduce((sum, item) => sum + item.amount, 0);
   
   // Calculate tax amount
   this.taxAmount = (this.subtotal * this.taxRate) / 100;
   
-  // Calculate total amount
-  this.totalAmount = this.subtotal + this.taxAmount - this.discountAmount;
+  // Calculate discount amount
+  this.discountAmount = (this.subtotal * this.discountRate) / 100;
   
-  // Calculate balance amount
-  this.balanceAmount = this.totalAmount - this.paidAmount;
+  // Calculate total
+  this.total = this.subtotal + this.taxAmount - this.discountAmount;
   
-  // Update payment status based on paid amount
-  if (this.paidAmount === 0) {
-    this.paymentStatus = 'Unpaid';
-  } else if (this.paidAmount >= this.totalAmount) {
-    this.paymentStatus = 'Paid';
-  } else {
-    this.paymentStatus = 'Partial';
+  // Update status based on payment
+  if (this.paymentDate && this.remainingBalance === 0) {
+    this.status = 'Paid';
+  } else if (this.isOverdue && this.status !== 'Paid' && this.status !== 'Cancelled') {
+    this.status = 'Overdue';
   }
   
-  next();
-});
-
-// Pre-save middleware to generate invoice number
-invoiceSchema.pre('save', async function(next) {
-  if (!this.invoiceNumber) {
-    const count = await mongoose.models.Invoice.countDocuments();
-    const year = new Date().getFullYear();
-    this.invoiceNumber = `INV-${year}-${String(count + 1).padStart(6, '0')}`;
-  }
   next();
 });
 
 // Indexes for better query performance
 invoiceSchema.index({ patientId: 1 });
-invoiceSchema.index({ invoiceNumber: 1 });
-invoiceSchema.index({ status: 1 });
-invoiceSchema.index({ paymentStatus: 1 });
-invoiceSchema.index({ invoiceDate: -1 });
+invoiceSchema.index({ invoiceNumber: 1 }, { unique: true });
+invoiceSchema.index({ invoiceDate: 1 });
 invoiceSchema.index({ dueDate: 1 });
+invoiceSchema.index({ status: 1 });
 invoiceSchema.index({ createdAt: -1 });
 
-// Static method to find invoices by date range
-invoiceSchema.statics.findByDateRange = function(startDate, endDate) {
-  return this.find({
-    invoiceDate: {
-      $gte: startDate,
-      $lte: endDate
-    }
-  }).populate('patientId', 'fullName phone email');
-};
+// Compound index for patient and status
+invoiceSchema.index({ patientId: 1, status: 1 });
 
 // Static method to find overdue invoices
 invoiceSchema.statics.findOverdue = function() {
@@ -225,28 +266,43 @@ invoiceSchema.statics.findByStatus = function(status) {
   return this.find({ status }).populate('patientId', 'fullName phone email');
 };
 
-// Instance method to mark as paid
-invoiceSchema.methods.markAsPaid = function(amount, method, date) {
-  this.paidAmount = amount || this.totalAmount;
-  this.paymentMethod = method;
-  this.paymentDate = date || new Date();
-  this.paymentStatus = 'Paid';
-  this.updatedAt = new Date();
-  return this.save();
+// Static method to find invoices by date range
+invoiceSchema.statics.findByDateRange = function(startDate, endDate) {
+  return this.find({
+    invoiceDate: {
+      $gte: startDate,
+      $lte: endDate
+    }
+  }).populate('patientId', 'fullName phone email');
 };
 
-// Instance method to add payment
-invoiceSchema.methods.addPayment = function(amount, method, date) {
-  this.paidAmount += amount;
-  this.paymentMethod = method;
-  this.paymentDate = date || new Date();
-  this.updatedAt = new Date();
-  return this.save();
-};
-
-// Instance method to send invoice
-invoiceSchema.methods.send = function() {
+// Instance method to mark as sent
+invoiceSchema.methods.markAsSent = function() {
   this.status = 'Sent';
+  this.updatedAt = new Date();
+  return this.save();
+};
+
+// Instance method to mark as paid
+invoiceSchema.methods.markAsPaid = function(paymentMethod = 'Other', reference = '') {
+  this.status = 'Paid';
+  this.paymentMethod = paymentMethod;
+  this.paymentDate = new Date();
+  this.paymentReference = reference;
+  this.updatedAt = new Date();
+  return this.save();
+};
+
+// Instance method to add partial payment
+invoiceSchema.methods.addPartialPayment = function(payment) {
+  this.partialPayments.push(payment);
+  
+  // Check if fully paid
+  if (this.remainingBalance === 0) {
+    this.status = 'Paid';
+    this.paymentDate = new Date();
+  }
+  
   this.updatedAt = new Date();
   return this.save();
 };
@@ -254,6 +310,23 @@ invoiceSchema.methods.send = function() {
 // Instance method to cancel invoice
 invoiceSchema.methods.cancel = function() {
   this.status = 'Cancelled';
+  this.updatedAt = new Date();
+  return this.save();
+};
+
+// Instance method to recalculate totals
+invoiceSchema.methods.recalculateTotals = function() {
+  // Recalculate item amounts
+  this.items.forEach(item => {
+    item.amount = item.quantity * item.rate;
+  });
+  
+  // Recalculate all totals
+  this.subtotal = this.items.reduce((sum, item) => sum + item.amount, 0);
+  this.taxAmount = (this.subtotal * this.taxRate) / 100;
+  this.discountAmount = (this.subtotal * this.discountRate) / 100;
+  this.total = this.subtotal + this.taxAmount - this.discountAmount;
+  
   this.updatedAt = new Date();
   return this.save();
 };

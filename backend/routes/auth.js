@@ -1,257 +1,268 @@
 const express = require('express');
+const { body, validationResult } = require('express-validator');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
-const User = require('../models/User');
-const Patient = require('../models/Patient');
-const { auth } = require('../middleware/auth');
+const Doctor = require('../models/Doctor');
+const OTP = require('../models/OTP');
+const emailService = require('../services/emailService');
 
 const router = express.Router();
 
-// Email transporter setup
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+const registerValidation = [
+  body('fullName').trim().isLength({ min: 1 }).withMessage('Full name is required'),
+  body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('specialty').optional().isString(),
+  body('phone').optional().isString(),
+];
 
-// Register user (with OTP verification)
-router.post('/register', async (req, res) => {
+const loginValidation = [
+  body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
+  body('password').isLength({ min: 1 }).withMessage('Password is required'),
+];
+
+const otpLoginValidation = [
+  body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
+  body('otp').isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits'),
+];
+
+const requestOTPValidation = [
+  body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
+];
+
+router.post('/register', registerValidation, async (req, res) => {
   try {
-    const { firstName, lastName, email, password, phone, role, clinicId, specialization, licenseNumber } = req.body;
-
-    // Validate required fields
-    if (!firstName || !lastName || !email || !password || !phone || !role) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Please provide all required fields: firstName, lastName, email, password, phone, role' 
-      });
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: 'Validation failed', details: errors.array() });
     }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ success: false, message: 'User already exists' });
+    const { fullName, email, password, specialty, phone } = req.body;
+
+    const existing = await Doctor.findOne({ email });
+    if (existing) {
+      return res.status(400).json({ error: 'Email already registered' });
     }
 
-    // Create new user
-    const user = new User({
-      firstName,
-      lastName,
-      email,
-      password,
-      phone,
-      role,
-      clinicId: role !== 'super_master_admin' ? clinicId : undefined,
-      specialization,
-      licenseNumber
-    });
+    const passwordHash = await bcrypt.hash(password, 10);
+    const doctor = await Doctor.create({ fullName, email, passwordHash, specialty, phone });
 
-    // Generate OTP
-    const otp = user.generateOTP();
-    await user.save();
+    // No need to create individual email configurations
+    // The system will use centralized email service for all OTP emails
+    console.log(`✅ Doctor ${fullName} registered successfully - OTP emails will be sent from centralized service`);
 
-    // Create patient record if role is patient
-    if (role === 'patient') {
-      await Patient.create({
-        userId: user._id,
-        clinicId,
-        dateOfBirth: req.body.dateOfBirth,
-        gender: req.body.gender,
-        emergencyContact: req.body.emergencyContact
-      });
-    }
-
-    // Send OTP via email (in production, use actual email service)
-    console.log(`OTP for ${email}: ${otp}`);
-
+    const token = jwt.sign({ id: doctor._id, role: doctor.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.status(201).json({
-      success: true,
-      message: 'User registered successfully. Please verify your email with the OTP sent.',
-      userId: user._id,
-      otp: otp // For development only - remove in production
-    });
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ success: false, message: 'Registration failed', error: error.message });
-  }
-});
-
-// Quick register (no OTP verification - for development/testing)
-router.post('/quick-register', async (req, res) => {
-  try {
-    const { firstName, lastName, email, password, phone, role, clinicId, specialization, licenseNumber } = req.body;
-
-    // Validate required fields
-    if (!firstName || !lastName || !email || !password || !phone || !role) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Please provide all required fields: firstName, lastName, email, password, phone, role' 
-      });
-    }
-
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ success: false, message: 'User already exists' });
-    }
-
-    // Create new user (already verified)
-    const user = new User({
-      firstName,
-      lastName,
-      email,
-      password,
-      phone,
-      role,
-      clinicId: role !== 'super_master_admin' ? clinicId : undefined,
-      specialization,
-      licenseNumber,
-      isVerified: true // Skip OTP verification
-    });
-
-    await user.save();
-
-    // Create patient record if role is patient
-    if (role === 'patient') {
-      await Patient.create({
-        userId: user._id,
-        clinicId,
-        dateOfBirth: req.body.dateOfBirth,
-        gender: req.body.gender,
-        emergencyContact: req.body.emergencyContact
-      });
-    }
-
-    // Generate token immediately
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '7d' });
-
-    res.status(201).json({
-      success: true,
-      message: 'User registered and logged in successfully',
+      message: 'Registration successful',
       token,
       user: {
-        id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        clinicId: user.clinicId,
-        specialization: user.specialization
+        id: doctor._id,
+        fullName: doctor.fullName,
+        email: doctor.email,
+        specialty: doctor.specialty,
+        role: doctor.role,
       }
     });
-  } catch (error) {
-    console.error('Quick registration error:', error);
-    res.status(500).json({ success: false, message: 'Registration failed', error: error.message });
+  } catch (err) {
+    console.error('Register error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Verify OTP
-router.post('/verify-otp', async (req, res) => {
+router.post('/login', loginValidation, async (req, res) => {
   try {
-    const { userId, otp } = req.body;
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: 'Validation failed', details: errors.array() });
     }
 
-    if (user.otp !== otp || user.otpExpires < new Date()) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+    const { email, password } = req.body;
+    const doctor = await Doctor.findOne({ email });
+    if (!doctor) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    user.isVerified = true;
-    user.otp = undefined;
-    user.otpExpires = undefined;
-    await user.save();
+    const ok = await doctor.comparePassword(password);
+    if (!ok) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
 
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
+    const token = jwt.sign({ id: doctor._id, role: doctor.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    res.json({
+      message: 'Login successful',
+      token,
+      user: {
+        id: doctor._id,
+        fullName: doctor.fullName,
+        email: doctor.email,
+        specialty: doctor.specialty,
+        role: doctor.role,
+      }
+    });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/auth/request-otp - Request OTP for login
+router.post('/request-otp', requestOTPValidation, async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Validation failed', 
+        details: errors.array() 
+      });
+    }
+
+    const { email } = req.body;
+
+    // Check if doctor exists
+    const doctor = await Doctor.findOne({ email });
+    if (!doctor) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'No account found with this email address' 
+      });
+    }
+
+    // Check for recent OTP requests (rate limiting)
+    const recentOTP = await OTP.findOne({
+      email,
+      purpose: 'login',
+      status: 'pending',
+      createdAt: { $gte: new Date(Date.now() - 60000) } // 1 minute ago
+    });
+
+    if (recentOTP) {
+      return res.status(429).json({
+        success: false,
+        error: 'Please wait before requesting another OTP. Try again in a minute.'
+      });
+    }
+
+    // Create OTP
+    const otp = await OTP.createOTP(
+      email,
+      'login',
+      doctor._id,
+      req.ip,
+      req.get('User-Agent')
+    );
+
+    // Send email using doctor's email configuration
+    const emailResult = await emailService.sendOTPEmail(doctor._id, email, otp.code, 'login');
+
+    if (!emailResult.success) {
+      // If email fails, delete the OTP
+      await OTP.findByIdAndDelete(otp._id);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to send OTP email. Please try again.'
+      });
+    }
 
     res.json({
       success: true,
-      message: 'Email verified successfully',
-      token,
-      user: {
-        id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        clinicId: user.clinicId
+      message: 'OTP sent successfully to your email address',
+      data: {
+        email: otp.email,
+        expiresAt: otp.expiresAt,
+        timeRemaining: otp.timeRemaining
       }
     });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'OTP verification failed', error: error.message });
+  } catch (err) {
+    console.error('Request OTP error:', err);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error' 
+    });
   }
 });
 
-// Login
-router.post('/login', async (req, res) => {
+// POST /api/auth/login-otp - Login with OTP
+router.post('/login-otp', otpLoginValidation, async (req, res) => {
   try {
-    const { email, password } = req.body;
-
-    // Find user
-    const user = await User.findOne({ email }).populate('clinicId');
-    if (!user) {
-      return res.status(400).json({ success: false, message: 'Invalid credentials' });
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Validation failed', 
+        details: errors.array() 
+      });
     }
 
-    // Check password
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(400).json({ success: false, message: 'Invalid credentials' });
+    const { email, otp } = req.body;
+
+    // Verify OTP
+    const verificationResult = await OTP.verifyOTP(email, otp, 'login');
+
+    if (!verificationResult.success) {
+      return res.status(400).json({
+        success: false,
+        error: verificationResult.message
+      });
     }
 
-    // Check if user is verified
-    if (!user.isVerified) {
-      return res.status(400).json({ success: false, message: 'Please verify your email first' });
+    const { otp: otpRecord } = verificationResult;
+
+    // Get doctor information
+    const doctor = await Doctor.findById(otpRecord.userId);
+    if (!doctor) {
+      return res.status(404).json({
+        success: false,
+        error: 'Doctor account not found'
+      });
     }
 
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save();
+    // Mark OTP as used
+    await otpRecord.markAsUsed();
 
-    // Generate token
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: doctor._id, role: doctor.role }, 
+      process.env.JWT_SECRET, 
+      { expiresIn: '7d' }
+    );
 
     res.json({
       success: true,
       message: 'Login successful',
       token,
       user: {
-        id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.role,
-        clinicId: user.clinicId,
-        specialization: user.specialization
+        id: doctor._id,
+        fullName: doctor.fullName,
+        email: doctor.email,
+        specialty: doctor.specialty,
+        role: doctor.role,
       }
     });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Login failed', error: error.message });
+  } catch (err) {
+    console.error('OTP login error:', err);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error' 
+    });
   }
 });
 
-// Get current user
-router.get('/me', auth, async (req, res) => {
+router.get('/me', async (req, res) => {
   try {
-    res.json({
-      success: true,
-      user: {
-        id: req.user._id,
-        firstName: req.user.firstName,
-        lastName: req.user.lastName,
-        email: req.user.email,
-        role: req.user.role,
-        clinicId: req.user.clinicId,
-        specialization: req.user.specialization
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to get user data', error: error.message });
+    const auth = req.headers.authorization || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+    if (!token) return res.status(401).json({ error: 'Missing token' });
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const doctor = await Doctor.findById(payload.id).select('-passwordHash');
+    if (!doctor) return res.status(401).json({ error: 'Invalid token' });
+    res.json({ user: doctor });
+  } catch (err) {
+    console.error('Me error:', err);
+    res.status(401).json({ error: 'Invalid token' });
   }
 });
 
 module.exports = router;
+
+

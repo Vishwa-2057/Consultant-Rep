@@ -1,407 +1,411 @@
 const express = require('express');
-const router = express.Router();
+const { body, validationResult } = require('express-validator');
 const Referral = require('../models/Referral');
 const Patient = require('../models/Patient');
-const { auth } = require('../middleware/auth');
-const { body, validationResult } = require('express-validator');
+const emailService = require('../services/emailService');
+const router = express.Router();
 
-// @route   GET /api/referrals
-// @desc    Get all referrals
-// @access  Private
-router.get('/', auth, async (req, res) => {
+// Validation middleware
+const validateReferral = [
+  body('patientId').isMongoId().withMessage('Valid patient ID is required'),
+  body('patientName').trim().isLength({ min: 1 }).withMessage('Patient name is required'),
+  body('specialistName').trim().isLength({ min: 1 }).withMessage('Specialist name is required'),
+  body('specialty').trim().isLength({ min: 1 }).withMessage('Specialty is required'),
+  body('urgency').isIn(['Low', 'Medium', 'High', 'Urgent']).withMessage('Valid urgency level is required'),
+  body('referralType').isIn(['inbound', 'outbound']).withMessage('Valid referral type is required'),
+  body('externalClinic').optional().trim(),
+  body('preferredDate').optional().isISO8601().withMessage('Valid preferred date is required')
+];
+
+// GET /api/referrals - Get all referrals with filtering and pagination
+router.get('/', async (req, res) => {
   try {
-    const { page = 1, limit = 10, status, urgency, specialty, search } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      status = '',
+      urgency = '',
+      specialty = '',
+      patientId = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    // Build query
+    const query = {};
     
-    let query = {};
+    if (status && status !== 'all') {
+      query.status = status;
+    }
     
-    // Add filters
-    if (status) query.status = status;
-    if (urgency) query.urgency = urgency;
-    if (specialty) query.specialty = { $regex: specialty, $options: 'i' };
-    if (search) {
-      query.$or = [
-        { patientName: { $regex: search, $options: 'i' } },
-        { specialistName: { $regex: search, $options: 'i' } },
-        { specialty: { $regex: search, $options: 'i' } },
-        { reason: { $regex: search, $options: 'i' } }
-      ];
+    if (urgency && urgency !== 'all') {
+      query.urgency = urgency;
+    }
+    
+    if (specialty && specialty !== 'all') {
+      query.specialty = specialty;
+    }
+    
+    if (patientId) {
+      query.patientId = patientId;
     }
 
+    // Build sort object
+    const sort = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    // Execute query with pagination
     const referrals = await Referral.find(query)
       .populate('patientId', 'fullName phone email')
+      .sort(sort)
       .limit(limit * 1)
       .skip((page - 1) * limit)
-      .sort({ createdAt: -1 });
+      .select('-__v');
 
+    // Get total count for pagination
     const total = await Referral.countDocuments(query);
 
     res.json({
-      success: true,
-      data: referrals,
+      referrals,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit)
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / limit),
+        totalReferrals: total,
+        hasNextPage: page * limit < total,
+        hasPrevPage: page > 1
       }
     });
   } catch (error) {
     console.error('Error fetching referrals:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching referrals',
-      error: error.message
-    });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// @route   GET /api/referrals/:id
-// @desc    Get referral by ID
-// @access  Private
-router.get('/:id', auth, async (req, res) => {
+// GET /api/referrals/:id - Get referral by ID
+router.get('/:id', async (req, res) => {
   try {
     const referral = await Referral.findById(req.params.id)
-      .populate('patientId', 'fullName phone email dateOfBirth gender address');
+      .populate('patientId', 'fullName phone email address')
+      .select('-__v');
     
     if (!referral) {
-      return res.status(404).json({
-        success: false,
-        message: 'Referral not found'
-      });
+      return res.status(404).json({ error: 'Referral not found' });
     }
-
-    res.json({
-      success: true,
-      data: referral
-    });
+    
+    res.json(referral);
   } catch (error) {
     console.error('Error fetching referral:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching referral',
-      error: error.message
-    });
+    if (error.kind === 'ObjectId') {
+      return res.status(400).json({ error: 'Invalid referral ID' });
+    }
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// @route   POST /api/referrals
-// @desc    Create new referral
-// @access  Private
-router.post('/', [
-  auth,
-  body('patientId').isMongoId().withMessage('Valid patient ID is required'),
-  body('patientName').notEmpty().withMessage('Patient name is required'),
-  body('specialistName').notEmpty().withMessage('Specialist name is required'),
-  body('specialty').notEmpty().withMessage('Specialty is required'),
-  body('reason').notEmpty().withMessage('Referral reason is required'),
-  body('urgency').isIn(['Low', 'Medium', 'High', 'Urgent']).withMessage('Valid urgency level is required')
-], async (req, res) => {
+// POST /api/referrals - Create new referral
+router.post('/', validateReferral, async (req, res) => {
   try {
+    // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        details: errors.array()
       });
     }
 
-    const {
-      patientId,
-      patientName,
-      specialistName,
-      specialty,
-      specialistContact,
-      specialistAddress,
-      reason,
-      clinicalHistory,
-      currentMedications,
-      testResults,
-      urgency,
-      preferredDate,
-      preferredTime,
-      insuranceInfo,
-      referringProvider,
-      specialInstructions
-    } = req.body;
-
-    // Verify patient exists
-    const patient = await Patient.findById(patientId);
+    // Check if patient exists
+    const patient = await Patient.findById(req.body.patientId);
     if (!patient) {
-      return res.status(404).json({
-        success: false,
-        message: 'Patient not found'
-      });
+      return res.status(404).json({ error: 'Patient not found' });
     }
 
-    const referral = new Referral({
-      patientId,
-      patientName,
-      specialistName,
-      specialty,
-      specialistContact,
-      specialistAddress,
-      reason,
-      clinicalHistory,
-      currentMedications,
-      testResults,
-      urgency,
-      preferredDate,
-      preferredTime,
-      insuranceInfo,
-      referringProvider,
-      specialInstructions
-    });
-
+    // Create new referral
+    const referral = new Referral(req.body);
     await referral.save();
 
+    const populatedReferral = await Referral.findById(referral._id)
+      .populate('patientId', 'fullName phone email');
+
+    // Send email notification to appropriate doctor
+    try {
+      const emailResult = await emailService.sendReferralNotification(populatedReferral);
+      if (emailResult.success) {
+        console.log(`✅ Email notification sent for referral ${referral._id}`);
+      } else {
+        console.warn(`⚠️ Failed to send email notification for referral ${referral._id}:`, emailResult.error);
+      }
+    } catch (emailError) {
+      console.error(`❌ Error sending email notification for referral ${referral._id}:`, emailError);
+      // Don't fail the referral creation if email fails
+    }
+
     res.status(201).json({
-      success: true,
       message: 'Referral created successfully',
-      data: referral
+      referral: populatedReferral
     });
   } catch (error) {
     console.error('Error creating referral:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while creating referral',
-      error: error.message
-    });
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        details: Object.values(error.errors).map(err => err.message)
+      });
+    }
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// @route   PUT /api/referrals/:id
-// @desc    Update referral
-// @access  Private
-router.put('/:id', auth, async (req, res) => {
+// PUT /api/referrals/:id - Update referral
+router.put('/:id', validateReferral, async (req, res) => {
   try {
-    const referral = await Referral.findById(req.params.id);
-    if (!referral) {
-      return res.status(404).json({
-        success: false,
-        message: 'Referral not found'
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        details: errors.array()
       });
     }
 
-    const allowedUpdates = [
-      'specialistName', 'specialty', 'specialistContact', 'specialistAddress',
-      'reason', 'clinicalHistory', 'currentMedications', 'testResults',
-      'urgency', 'preferredDate', 'preferredTime', 'status', 'statusNotes',
-      'insuranceInfo', 'specialInstructions'
-    ];
+    // Check if referral exists
+    const referral = await Referral.findById(req.params.id);
+    if (!referral) {
+      return res.status(404).json({ error: 'Referral not found' });
+    }
 
-    allowedUpdates.forEach(field => {
-      if (req.body[field] !== undefined) {
-        referral[field] = req.body[field];
-      }
-    });
-
-    referral.updatedAt = new Date();
-    await referral.save();
+    // Update referral
+    const updatedReferral = await Referral.findByIdAndUpdate(
+      req.params.id,
+      { ...req.body, updatedAt: new Date() },
+      { new: true, runValidators: true }
+    )
+    .populate('patientId', 'fullName phone email')
+    .select('-__v');
 
     res.json({
-      success: true,
       message: 'Referral updated successfully',
-      data: referral
+      referral: updatedReferral
     });
   } catch (error) {
     console.error('Error updating referral:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while updating referral',
-      error: error.message
-    });
+    if (error.kind === 'ObjectId') {
+      return res.status(400).json({ error: 'Invalid referral ID' });
+    }
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        details: Object.values(error.errors).map(err => err.message)
+      });
+    }
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// @route   PUT /api/referrals/:id/status
-// @desc    Update referral status
-// @access  Private
-router.put('/:id/status', [
-  auth,
-  body('status').isIn(['Pending', 'Approved', 'In Progress', 'Completed', 'Cancelled']).withMessage('Valid status is required')
-], async (req, res) => {
+// DELETE /api/referrals/:id - Delete referral
+router.delete('/:id', async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
+    const referral = await Referral.findById(req.params.id);
+    
+    if (!referral) {
+      return res.status(404).json({ error: 'Referral not found' });
+    }
+
+    await Referral.findByIdAndDelete(req.params.id);
+    
+    res.json({ message: 'Referral deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting referral:', error);
+    if (error.kind === 'ObjectId') {
+      return res.status(400).json({ error: 'Invalid referral ID' });
+    }
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/referrals/:id/status - Update referral status
+router.patch('/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+    if (!status || !['Pending', 'Approved', 'In Progress', 'Completed', 'Cancelled'].includes(status)) {
+      return res.status(400).json({ error: 'Valid status is required' });
     }
 
     const referral = await Referral.findById(req.params.id);
     if (!referral) {
-      return res.status(404).json({
-        success: false,
-        message: 'Referral not found'
-      });
+      return res.status(404).json({ error: 'Referral not found' });
     }
 
-    const { status, notes } = req.body;
+    referral.status = status;
+    referral.updatedAt = new Date();
+    await referral.save();
 
-    switch (status) {
-      case 'Approved':
-        await referral.approve(notes);
-        break;
-      case 'In Progress':
-        await referral.start(notes);
-        break;
-      case 'Completed':
-        await referral.complete(notes);
-        break;
-      case 'Cancelled':
-        await referral.cancel(notes);
-        break;
-      default:
-        referral.status = status;
-        if (notes) referral.statusNotes = notes;
-        await referral.save();
-    }
+    const updatedReferral = await Referral.findById(req.params.id)
+      .populate('patientId', 'fullName phone email');
 
     res.json({
-      success: true,
       message: 'Referral status updated successfully',
-      data: referral
+      referral: updatedReferral
     });
   } catch (error) {
     console.error('Error updating referral status:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while updating referral status',
-      error: error.message
-    });
-  }
-});
-
-// @route   PUT /api/referrals/:id/urgency
-// @desc    Update referral urgency
-// @access  Private
-router.put('/:id/urgency', [
-  auth,
-  body('urgency').isIn(['Low', 'Medium', 'High', 'Urgent']).withMessage('Valid urgency level is required')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
+    if (error.kind === 'ObjectId') {
+      return res.status(400).json({ error: 'Invalid referral ID' });
     }
-
-    const referral = await Referral.findById(req.params.id);
-    if (!referral) {
-      return res.status(404).json({
-        success: false,
-        message: 'Referral not found'
-      });
-    }
-
-    const { urgency } = req.body;
-    await referral.updateUrgency(urgency);
-
-    res.json({
-      success: true,
-      message: 'Referral urgency updated successfully',
-      data: referral
-    });
-  } catch (error) {
-    console.error('Error updating referral urgency:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while updating referral urgency',
-      error: error.message
-    });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// @route   GET /api/referrals/urgent
-// @desc    Get urgent referrals
-// @access  Private
-router.get('/urgent', auth, async (req, res) => {
-  try {
-    const urgentReferrals = await Referral.findUrgent();
-
-    res.json({
-      success: true,
-      data: urgentReferrals
-    });
-  } catch (error) {
-    console.error('Error fetching urgent referrals:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching urgent referrals',
-      error: error.message
-    });
-  }
-});
-
-// @route   GET /api/referrals/overdue
-// @desc    Get overdue referrals
-// @access  Private
-router.get('/overdue', auth, async (req, res) => {
-  try {
-    const overdueReferrals = await Referral.findOverdue();
-
-    res.json({
-      success: true,
-      data: overdueReferrals
-    });
-  } catch (error) {
-    console.error('Error fetching overdue referrals:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching overdue referrals',
-      error: error.message
-    });
-  }
-});
-
-// @route   GET /api/referrals/stats/overview
-// @desc    Get referral statistics
-// @access  Private
-router.get('/stats/overview', auth, async (req, res) => {
+// GET /api/referrals/stats/summary - Get referral statistics
+router.get('/stats/summary', async (req, res) => {
   try {
     const totalReferrals = await Referral.countDocuments();
-    const pendingReferrals = await Referral.countDocuments({ status: 'Pending' });
-    const approvedReferrals = await Referral.countDocuments({ status: 'Approved' });
-    const completedReferrals = await Referral.countDocuments({ status: 'Completed' });
-    const urgentReferrals = await Referral.countDocuments({ urgency: { $in: ['High', 'Urgent'] } });
     
-    // Get specialties distribution
-    const specialties = await Referral.aggregate([
-      { $group: { _id: '$specialty', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
+    // Get referrals by status
+    const statusStats = await Referral.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      }
     ]);
 
-    // Get urgency distribution
-    const urgencyDistribution = await Referral.aggregate([
-      { $group: { _id: '$urgency', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
+    // Get referrals by urgency
+    const urgencyStats = await Referral.aggregate([
+      {
+        $group: {
+          _id: '$urgency',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Get referrals by specialty
+    const specialtyStats = await Referral.aggregate([
+      {
+        $group: {
+          _id: '$specialty',
+          count: { $sum: 1 }
+        }
+      }
     ]);
 
     res.json({
-      success: true,
-      data: {
-        totalReferrals,
-        pendingReferrals,
-        approvedReferrals,
-        completedReferrals,
-        urgentReferrals,
-        specialties,
-        urgencyDistribution
-      }
+      totalReferrals,
+      statusStats,
+      urgencyStats,
+      specialtyStats
     });
   } catch (error) {
     console.error('Error fetching referral stats:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching referral statistics',
-      error: error.message
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/referrals/:id/generate-link - Generate shareable referral link
+router.post('/:id/generate-link', async (req, res) => {
+  try {
+    const referral = await Referral.findById(req.params.id);
+    if (!referral) {
+      return res.status(404).json({ error: 'Referral not found' });
+    }
+
+    // Generate unique referral code
+    const referralCode = `REF-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+    const shareableLink = `${req.protocol}://${req.get('host')}/shared-referral/${referralCode}`;
+    
+    // Update referral with shareable link info
+    referral.shareableLink = {
+      code: referralCode,
+      url: shareableLink,
+      generatedAt: new Date(),
+      isActive: true,
+      accessCount: 0
+    };
+    
+    await referral.save();
+
+    res.json({
+      message: 'Referral link generated successfully',
+      referralCode,
+      shareableLink,
+      generatedAt: referral.shareableLink.generatedAt
     });
+  } catch (error) {
+    console.error('Error generating referral link:', error);
+    if (error.kind === 'ObjectId') {
+      return res.status(400).json({ error: 'Invalid referral ID' });
+    }
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/referrals/shared/:code - Get referral by shareable code
+router.get('/shared/:code', async (req, res) => {
+  try {
+    const referral = await Referral.findOne({ 
+      'shareableLink.code': req.params.code,
+      'shareableLink.isActive': true 
+    })
+    .populate('patientId', 'fullName phone email')
+    .select('-__v');
+    
+    if (!referral) {
+      return res.status(404).json({ error: 'Referral link not found or expired' });
+    }
+
+    // Increment access count
+    referral.shareableLink.accessCount += 1;
+    referral.shareableLink.lastAccessedAt = new Date();
+    await referral.save();
+    
+    res.json({
+      referral: {
+        id: referral._id,
+        patientName: referral.patientName,
+        specialistName: referral.specialistName,
+        specialty: referral.specialty,
+        reason: referral.reason,
+        urgency: referral.urgency,
+        status: referral.status,
+        createdAt: referral.createdAt,
+        preferredDate: referral.preferredDate
+      },
+      accessCount: referral.shareableLink.accessCount
+    });
+  } catch (error) {
+    console.error('Error fetching shared referral:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/referrals/:id/deactivate-link - Deactivate shareable link
+router.patch('/:id/deactivate-link', async (req, res) => {
+  try {
+    const referral = await Referral.findById(req.params.id);
+    if (!referral) {
+      return res.status(404).json({ error: 'Referral not found' });
+    }
+
+    if (!referral.shareableLink) {
+      return res.status(400).json({ error: 'No shareable link found for this referral' });
+    }
+
+    referral.shareableLink.isActive = false;
+    referral.shareableLink.deactivatedAt = new Date();
+    await referral.save();
+
+    res.json({
+      message: 'Referral link deactivated successfully'
+    });
+  } catch (error) {
+    console.error('Error deactivating referral link:', error);
+    if (error.kind === 'ObjectId') {
+      return res.status(400).json({ error: 'Invalid referral ID' });
+    }
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

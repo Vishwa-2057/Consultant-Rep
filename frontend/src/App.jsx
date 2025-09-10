@@ -1,143 +1,76 @@
-import React from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
-import { useAuth } from './contexts/AuthContext'
+import { Toaster } from "@/components/ui/toaster.jsx";
+import { Toaster as Sonner } from "@/components/ui/sonner.jsx";
+import { TooltipProvider } from "@/components/ui/tooltip.jsx";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Layout } from "./components/Layout.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
+import PatientManagement from "./pages/PatientManagement.jsx";
+import Login from "./pages/Login.jsx";
+import Register from "./pages/Register.jsx";
+import Logout from "./pages/Logout.jsx";
+import { useEffect, useState } from "react";
+import { authAPI } from "@/services/api";
+import Teleconsultation from "./pages/Teleconsultation.jsx";
+import ReferralSystem from "./pages/ReferralSystem.jsx";
+import SharedReferral from "./pages/SharedReferral.jsx";
+import Billing from "./pages/Billing.jsx";
+import CommunityHub from "./pages/CommunityHub.jsx";
+import NotFound from "./pages/NotFound.jsx";
+import APITest from "./components/APITest.jsx";
+import EmailSettings from "./pages/EmailSettings.jsx";
 
-// Auth Components
-import Login from './components/auth/Login'
-import Register from './components/auth/Register'
-import OTPVerification from './components/auth/OTPVerification'
+const queryClient = new QueryClient();
 
-// Layout
-import DashboardLayout from './components/layout/DashboardLayout'
+const App = () => {
+  const [token, setToken] = useState(localStorage.getItem('authToken'));
+  const isAuthed = Boolean(token);
 
-// Dashboard Components
-import SuperMasterAdminDashboard from './components/dashboards/SuperMasterAdminDashboard'
-import SuperAdminDashboard from './components/dashboards/SuperAdminDashboard'
-import DoctorDashboard from './components/dashboards/DoctorDashboard'
-import NurseDashboard from './components/dashboards/NurseDashboard'
-import BillingDashboard from './components/dashboards/BillingDashboard'
-import PharmacyDashboard from './components/dashboards/PharmacyDashboard'
-import PatientDashboard from './components/dashboards/PatientDashboard'
-
-// Feature Components
-import Clinics from './components/clinics/Clinics'
-import Users from './components/users/Users'
-import Patients from './components/patients/Patients'
-import Appointments from './components/pages/Appointments'
-import ClinicManagement from './components/pages/ClinicManagement'
-import LabDiagnostics from './components/pages/LabDiagnostics'
-import DoctorsManagement from './components/pages/DoctorsManagement'
-import Referrals from './components/pages/Referrals'
-import ReportsAnalytics from './components/pages/ReportsAnalytics'
-import BillingInsurance from './components/pages/BillingInsurance'
-import PharmacyManagement from './components/pages/PharmacyManagement'
-import StaffManagement from './components/pages/StaffManagement'
-import Settings from './components/pages/Settings'
-import CustomerSupport from './components/pages/CustomerSupport'
-import Billing from './components/billing/Billing'
-
-function App() {
-  const { user, loading } = useAuth()
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/verify-otp" element={<OTPVerification />} />
-          <Route path="*" element={<Navigate to="/login" />} />
-        </Routes>
-      </div>
-    )
-  }
-
-  const getDashboardComponent = (role) => {
-    switch (role) {
-      case 'super_master_admin':
-        return <SuperMasterAdminDashboard />
-      case 'super_admin':
-        return <SuperAdminDashboard />
-      case 'doctor':
-        return <DoctorDashboard />
-      case 'nurse':
-        return <NurseDashboard />
-      case 'billing_staff':
-        return <BillingDashboard />
-      case 'pharmacy_staff':
-        return <PharmacyDashboard />
-      case 'patient':
-        return <PatientDashboard />
-      default:
-        return <div>Invalid role</div>
-    }
-  }
+  useEffect(() => {
+    const stored = localStorage.getItem('authToken');
+    if (stored) authAPI.setToken(stored);
+    // Listen for auth changes triggered by login/logout
+    const handleAuthChanged = () => {
+      const latest = localStorage.getItem('authToken');
+      setToken(latest);
+      if (latest) {
+        authAPI.setToken(latest);
+      } else {
+        authAPI.clearToken();
+      }
+    };
+    window.addEventListener('auth-changed', handleAuthChanged);
+    return () => window.removeEventListener('auth-changed', handleAuthChanged);
+  }, []);
 
   return (
-    <DashboardLayout>
-      <Routes>
-        <Route path="/" element={getDashboardComponent(user.role)} />
-        <Route path="/dashboard" element={getDashboardComponent(user.role)} />
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Layout>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/" element={isAuthed ? <Dashboard /> : <Navigate to="/login" replace />} />
+              <Route path="/patients" element={isAuthed ? <PatientManagement /> : <Navigate to="/login" replace />} />
+              <Route path="/teleconsultation" element={isAuthed ? <Teleconsultation /> : <Navigate to="/login" replace />} />
+              <Route path="/referrals" element={isAuthed ? <ReferralSystem /> : <Navigate to="/login" replace />} />
+              <Route path="/shared-referral/:code" element={<SharedReferral />} />
+              <Route path="/billing" element={isAuthed ? <Billing /> : <Navigate to="/login" replace />} />
+              <Route path="/community" element={isAuthed ? <CommunityHub /> : <Navigate to="/login" replace />} />
+              <Route path="/email-settings" element={isAuthed ? <EmailSettings /> : <Navigate to="/login" replace />} />
+              <Route path="/api-test" element={<APITest />} />
+              <Route path="/logout" element={<Logout />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Layout>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
-        {/* Super Master Admin Routes */}
-        {user.role === 'super_master_admin' && (
-          <>
-            <Route path="/clinics" element={<Clinics />} />
-            <Route path="/appointments" element={<Appointments />} />
-            <Route path="/doctors" element={<DoctorsManagement />} />
-            <Route path="/lab-diagnostics" element={<LabDiagnostics />} />
-            <Route path="/referrals" element={<Referrals />} />
-            <Route path="/reports-analytics" element={<ReportsAnalytics />} />
-            <Route path="/billing-insurance" element={<BillingInsurance />} />
-            <Route path="/pharmacy" element={<PharmacyManagement />} />
-            <Route path="/users" element={<StaffManagement />} />
-            <Route path="/patients" element={<Patients />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/support" element={<CustomerSupport />} />
-            <Route path="/billing" element={<Billing />} />
-          </>
-        )}
-
-        {/* Admin Routes */}
-        {user.role === 'super_admin' && (
-          <>
-            {/* <Route path="/clinics" element={<Clinics />} /> */}
-            <Route path="/users" element={<Users />} />
-            <Route path="/patients" element={<Patients />} />
-            <Route path="/billing" element={<Billing />} />
-          </>
-        )}
-
-        {/* Doctor/Nurse Routes */}
-        {(user.role === 'doctor' || user.role === 'nurse' || user.role === 'super_admin') && (
-          <>
-            <Route path="/appointments" element={<Appointments />} />
-            <Route path="/patients" element={<Patients />} />
-          </>
-        )}
-
-        {/* Billing Staff Routes */}
-        {user.role === 'billing_staff' && (
-          <Route path="/billing" element={<Billing />} />
-        )}
-
-        {/* Patient Routes */}
-        {user.role === 'patient' && (
-          <Route path="/appointments" element={<Appointments />} />
-        )}
-
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </DashboardLayout>
-  )
-}
-
-export default App
+export default App;

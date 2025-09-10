@@ -2,45 +2,121 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 198 25% 25%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 198 25% 25%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 198 25% 25%;
+
+    --primary: 173 60% 40%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 187 85% 53%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 180 11% 96%;
+    --muted-foreground: 180 10% 45%;
+
+    --accent: 172 100% 95%;
+    --accent-foreground: 173 60% 40%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 149 100% 35%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 45 93% 47%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 180 20% 90%;
+    --input: 180 20% 94%;
+    --ring: 173 60% 40%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(173 60% 40%), hsl(187 85% 53%));
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%), hsl(180 11% 98%));
+    --shadow-soft: 0 4px 20px -2px hsl(173 60% 40% / 0.1);
+    --shadow-medical: 0 8px 32px -4px hsl(173 60% 40% / 0.15);
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 198 25% 8%;
+    --foreground: 180 11% 96%;
+
+    --card: 198 25% 10%;
+    --card-foreground: 180 11% 96%;
+
+    --popover: 198 25% 10%;
+    --popover-foreground: 180 11% 96%;
+
+    --primary: 173 60% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 187 85% 58%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 198 25% 15%;
+    --muted-foreground: 180 10% 65%;
+
+    --accent: 198 25% 15%;
+    --accent-foreground: 173 60% 45%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 149 100% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 45 93% 52%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 198 25% 20%;
+    --input: 198 25% 18%;
+    --ring: 173 60% 45%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
 }
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+@layer base {
+  * {
+    @apply border-border;
+  }
 
-@layer components {
-  .sidebar-link {
-    @apply flex items-center px-4 py-3 text-gray-700 rounded-lg transition-colors duration-200 hover:bg-primary-50 hover:text-primary-600;
-  }
-  
-  .sidebar-link.active {
-    @apply bg-primary-500 text-white hover:bg-primary-600;
-  }
-  
-  .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6;
-  }
-  
-  .btn-primary {
-    @apply bg-primary-500 hover:bg-primary-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
-  }
-  
-  .btn-secondary {
-    @apply bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
-  }
-  
-  .form-input {
-    @apply block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500;
-  }
-  
-  .form-label {
-    @apply block text-sm font-medium text-gray-700 mb-2;
+  body {
+    @apply bg-background text-foreground;
   }
 }
