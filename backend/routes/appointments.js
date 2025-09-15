@@ -1,12 +1,14 @@
 const express = require('express');
-const { body, validationResult } = require('express-validator');
-const Appointment = require('../models/Appointment');
-const Patient = require('../models/Patient');
 const router = express.Router();
+const { body, validationResult } = require('express-validator');
+const mongoose = require('mongoose');
+const Appointment = require('../models/Appointment');
+const auth = require('../middleware/auth');
 
 // Validation middleware
 const validateAppointment = [
   body('patientId').isMongoId().withMessage('Valid patient ID is required'),
+  body('doctorId').isMongoId().withMessage('Valid doctor ID is required'),
   body('appointmentType').isIn(['General Consultation', 'Follow-up Visit', 'Annual Checkup', 'Specialist Consultation', 'Emergency Visit', 'Lab Work', 'Imaging', 'Vaccination', 'Physical Therapy', 'Mental Health']).withMessage('Valid appointment type is required'),
   body('date').isISO8601().withMessage('Valid appointment date is required'),
   body('time').trim().isLength({ min: 1 }).withMessage('Appointment time is required'),
@@ -15,7 +17,7 @@ const validateAppointment = [
 ];
 
 // GET /api/appointments - Get all appointments with filtering and pagination
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
     const {
       page = 1,
@@ -29,7 +31,7 @@ router.get('/', async (req, res) => {
     } = req.query;
 
     // Build query
-    const query = {};
+    let query = {};
     
     if (status && status !== 'all') {
       query.status = status;
@@ -54,16 +56,98 @@ router.get('/', async (req, res) => {
     const sort = {};
     sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
-    // Execute query with pagination
-    const appointments = await Appointment.find(query)
-      .populate('patientId', 'fullName phone email')
-      .sort(sort)
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .select('-__v');
+    let appointments;
+    let total;
 
-    // Get total count for pagination
-    const total = await Appointment.countDocuments(query);
+    // Role-based filtering: doctors only see appointments for patients assigned to them
+    if (req.user.role === 'doctor') {
+      // Use aggregation to filter appointments based on patient's assignedDoctors array
+      const pipeline = [
+        { $match: query },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patient'
+          }
+        },
+        {
+          $match: {
+            'patient.assignedDoctors': new mongoose.Types.ObjectId(req.user.id)
+          }
+        },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patientId',
+            pipeline: [
+              { $project: { fullName: 1, phone: 1, email: 1 } }
+            ]
+          }
+        },
+        {
+          $lookup: {
+            from: 'doctors',
+            localField: 'doctorId',
+            foreignField: '_id',
+            as: 'doctorId',
+            pipeline: [
+              { $project: { fullName: 1, specialty: 1, phone: 1 } }
+            ]
+          }
+        },
+        {
+          $unwind: { path: '$patientId', preserveNullAndEmptyArrays: true }
+        },
+        {
+          $unwind: { path: '$doctorId', preserveNullAndEmptyArrays: true }
+        },
+        {
+          $project: { patient: 0, __v: 0 }
+        },
+        { $sort: sort },
+        { $skip: (page - 1) * limit },
+        { $limit: parseInt(limit) }
+      ];
+
+      appointments = await Appointment.aggregate(pipeline);
+
+      // Get total count for pagination
+      const countPipeline = [
+        { $match: query },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patient'
+          }
+        },
+        {
+          $match: {
+            'patient.assignedDoctors': new mongoose.Types.ObjectId(req.user.id)
+          }
+        },
+        { $count: 'total' }
+      ];
+
+      const countResult = await Appointment.aggregate(countPipeline);
+      total = countResult.length > 0 ? countResult[0].total : 0;
+    } else {
+      // Super admin sees all appointments
+      appointments = await Appointment.find(query)
+        .populate('patientId', 'fullName phone email')
+        .populate('doctorId', 'fullName specialty phone')
+        .sort(sort)
+        .limit(limit * 1)
+        .skip((page - 1) * limit)
+        .select('-__v');
+
+      total = await Appointment.countDocuments(query);
+    }
 
     res.json({
       appointments,
@@ -297,18 +381,77 @@ router.patch('/:id/status', async (req, res) => {
 });
 
 // GET /api/appointments/today - Get today's appointments
-router.get('/today', async (req, res) => {
+router.get('/today', auth, async (req, res) => {
   try {
     const today = new Date();
     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
-    const appointments = await Appointment.find({
+    const query = {
       date: { $gte: startOfDay, $lt: endOfDay }
-    })
-    .populate('patientId', 'fullName phone email')
-    .sort({ time: 1 })
-    .select('-__v');
+    };
+
+    let appointments;
+
+    // Role-based filtering: doctors only see appointments for patients assigned to them
+    if (req.user.role === 'doctor') {
+      const pipeline = [
+        { $match: query },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patient'
+          }
+        },
+        {
+          $match: {
+            'patient.assignedDoctors': new mongoose.Types.ObjectId(req.user.id)
+          }
+        },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patientId',
+            pipeline: [
+              { $project: { fullName: 1, phone: 1, email: 1 } }
+            ]
+          }
+        },
+        {
+          $lookup: {
+            from: 'doctors',
+            localField: 'doctorId',
+            foreignField: '_id',
+            as: 'doctorId',
+            pipeline: [
+              { $project: { fullName: 1, specialty: 1, phone: 1 } }
+            ]
+          }
+        },
+        {
+          $unwind: { path: '$patientId', preserveNullAndEmptyArrays: true }
+        },
+        {
+          $unwind: { path: '$doctorId', preserveNullAndEmptyArrays: true }
+        },
+        {
+          $project: { patient: 0, __v: 0 }
+        },
+        { $sort: { time: 1 } }
+      ];
+
+      appointments = await Appointment.aggregate(pipeline);
+    } else {
+      appointments = await Appointment.find(query)
+        .populate('patientId', 'fullName phone email')
+        .populate('doctorId', 'fullName specialty phone')
+        .sort({ time: 1 })
+        .select('-__v');
+    }
 
     res.json(appointments);
   } catch (error) {
@@ -318,19 +461,79 @@ router.get('/today', async (req, res) => {
 });
 
 // GET /api/appointments/upcoming - Get upcoming appointments
-router.get('/upcoming', async (req, res) => {
+router.get('/upcoming', auth, async (req, res) => {
   try {
     const { limit = 10 } = req.query;
     
-    const appointments = await Appointment.find({
+    const query = {
       date: { $gte: new Date() },
       status: { $in: ['Scheduled', 'Confirmed'] }
-    })
-    .populate('patientId', 'fullName phone email')
-    .sort({ date: 1, time: 1 })
-    .limit(parseInt(limit))
-    .select('-__v');
+    };
 
+    let appointments;
+
+    // Role-based filtering: doctors only see appointments for patients assigned to them
+    if (req.user.role === 'doctor') {
+      const pipeline = [
+        { $match: query },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patient'
+          }
+        },
+        {
+          $match: {
+            'patient.assignedDoctors': new mongoose.Types.ObjectId(req.user.id)
+          }
+        },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patientId',
+            pipeline: [
+              { $project: { fullName: 1, phone: 1, email: 1 } }
+            ]
+          }
+        },
+        {
+          $lookup: {
+            from: 'doctors',
+            localField: 'doctorId',
+            foreignField: '_id',
+            as: 'doctorId',
+            pipeline: [
+              { $project: { fullName: 1, specialty: 1, phone: 1 } }
+            ]
+          }
+        },
+        {
+          $unwind: { path: '$patientId', preserveNullAndEmptyArrays: true }
+        },
+        {
+          $unwind: { path: '$doctorId', preserveNullAndEmptyArrays: true }
+        },
+        {
+          $project: { patient: 0, __v: 0 }
+        },
+        { $sort: { date: 1, time: 1 } },
+        { $limit: parseInt(limit) }
+      ];
+
+      appointments = await Appointment.aggregate(pipeline);
+    } else {
+      appointments = await Appointment.find(query)
+        .populate('patientId', 'fullName phone email')
+        .populate('doctorId', 'fullName specialty phone')
+        .sort({ date: 1, time: 1 })
+        .limit(parseInt(limit))
+        .select('-__v');
+    }
+    
     res.json(appointments);
   } catch (error) {
     console.error('Error fetching upcoming appointments:', error);
@@ -339,40 +542,166 @@ router.get('/upcoming', async (req, res) => {
 });
 
 // GET /api/appointments/stats/summary - Get appointment statistics
-router.get('/stats/summary', async (req, res) => {
+router.get('/stats/summary', auth, async (req, res) => {
   try {
     const today = new Date();
     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
     
-    const totalAppointments = await Appointment.countDocuments();
-    const todayAppointments = await Appointment.countDocuments({
-      date: { $gte: startOfDay, $lt: endOfDay }
-    });
-    const upcomingAppointments = await Appointment.countDocuments({
-      date: { $gte: new Date() },
-      status: { $in: ['Scheduled', 'Confirmed'] }
-    });
-    
-    // Get appointments by status
-    const statusStats = await Appointment.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
+    let totalAppointments, todayAppointments, upcomingAppointments, statusStats, typeStats;
 
-    // Get appointments by type
-    const typeStats = await Appointment.aggregate([
-      {
-        $group: {
-          _id: '$appointmentType',
-          count: { $sum: 1 }
+    if (req.user.role === 'doctor') {
+      // For doctors, use aggregation to filter by patient's assignedDoctors array
+      const doctorObjectId = new mongoose.Types.ObjectId(req.user.id);
+      
+      // Total appointments for assigned patients
+      const totalPipeline = [
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patient'
+          }
+        },
+        {
+          $match: {
+            'patient.assignedDoctors': doctorObjectId
+          }
+        },
+        { $count: 'total' }
+      ];
+      
+      const totalResult = await Appointment.aggregate(totalPipeline);
+      totalAppointments = totalResult.length > 0 ? totalResult[0].total : 0;
+
+      // Today's appointments for assigned patients
+      const todayPipeline = [
+        {
+          $match: {
+            date: { $gte: startOfDay, $lt: endOfDay }
+          }
+        },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patient'
+          }
+        },
+        {
+          $match: {
+            'patient.assignedDoctors': doctorObjectId
+          }
+        },
+        { $count: 'total' }
+      ];
+      
+      const todayResult = await Appointment.aggregate(todayPipeline);
+      todayAppointments = todayResult.length > 0 ? todayResult[0].total : 0;
+
+      // Upcoming appointments for assigned patients
+      const upcomingPipeline = [
+        {
+          $match: {
+            date: { $gte: new Date() },
+            status: { $in: ['Scheduled', 'Confirmed'] }
+          }
+        },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patient'
+          }
+        },
+        {
+          $match: {
+            'patient.assignedDoctors': doctorObjectId
+          }
+        },
+        { $count: 'total' }
+      ];
+      
+      const upcomingResult = await Appointment.aggregate(upcomingPipeline);
+      upcomingAppointments = upcomingResult.length > 0 ? upcomingResult[0].total : 0;
+
+      // Status stats for assigned patients
+      statusStats = await Appointment.aggregate([
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patient'
+          }
+        },
+        {
+          $match: {
+            'patient.assignedDoctors': doctorObjectId
+          }
+        },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 }
+          }
         }
-      }
-    ]);
+      ]);
+
+      // Type stats for assigned patients
+      typeStats = await Appointment.aggregate([
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patient'
+          }
+        },
+        {
+          $match: {
+            'patient.assignedDoctors': doctorObjectId
+          }
+        },
+        {
+          $group: {
+            _id: '$appointmentType',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+    } else {
+      // Super admin sees all appointments
+      totalAppointments = await Appointment.countDocuments({});
+      todayAppointments = await Appointment.countDocuments({
+        date: { $gte: startOfDay, $lt: endOfDay }
+      });
+      upcomingAppointments = await Appointment.countDocuments({
+        date: { $gte: new Date() },
+        status: { $in: ['Scheduled', 'Confirmed'] }
+      });
+      
+      statusStats = await Appointment.aggregate([
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+
+      typeStats = await Appointment.aggregate([
+        {
+          $group: {
+            _id: '$appointmentType',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+    }
 
     res.json({
       totalAppointments,

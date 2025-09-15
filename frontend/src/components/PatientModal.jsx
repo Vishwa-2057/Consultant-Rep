@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Dialog, 
   DialogContent, 
@@ -13,10 +13,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { User, Phone, Mail, MapPin, Calendar, Heart, FileText, Plus, X } from "lucide-react";
-import { appointmentAPI, patientAPI } from "@/services/api";
+import { User, Phone, Mail, MapPin, Calendar, Heart, FileText, Plus, X, UserCheck } from "lucide-react";
+import { appointmentAPI, patientAPI, doctorAPI } from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
 
 const PatientModal = ({ isOpen, onClose, onSubmit }) => {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     fullName: "",
     dateOfBirth: "",
@@ -27,6 +29,7 @@ const PatientModal = ({ isOpen, onClose, onSubmit }) => {
     city: "",
     state: "",
     zipCode: "",
+    assignedDoctors: [],
     emergencyContact: {
       name: "",
       relationship: "",
@@ -47,10 +50,34 @@ const PatientModal = ({ isOpen, onClose, onSubmit }) => {
   });
 
   const [errors, setErrors] = useState({});
+  const [doctors, setDoctors] = useState([]);
+  const [doctorsLoading, setDoctorsLoading] = useState(false);
   const [newCondition, setNewCondition] = useState("");
   const [newAllergy, setNewAllergy] = useState("");
   const [newMedication, setNewMedication] = useState("");
   const [newSurgery, setNewSurgery] = useState("");
+
+  // Load doctors when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      loadDoctors();
+    }
+  }, [isOpen]);
+
+  const loadDoctors = async () => {
+    setDoctorsLoading(true);
+    try {
+      const response = await doctorAPI.getAll();
+      const doctorsList = response.doctors || response.data || [];
+      console.log('Loaded doctors:', doctorsList);
+      setDoctors(Array.isArray(doctorsList) ? doctorsList : []);
+    } catch (error) {
+      console.error('Failed to load doctors:', error);
+      setDoctors([]);
+    } finally {
+      setDoctorsLoading(false);
+    }
+  };
 
   const handleInputChange = (field, value) => {
     if (field.includes('.')) {
@@ -130,6 +157,7 @@ const PatientModal = ({ isOpen, onClose, onSubmit }) => {
           fullName: formData.fullName.trim(),
           dateOfBirth: formData.dateOfBirth,
           gender: formData.gender,
+          assignedDoctors: formData.assignedDoctors,
           phone: formData.phone.trim(),
           email: formData.email.trim(),
           address: {
@@ -158,16 +186,26 @@ const PatientModal = ({ isOpen, onClose, onSubmit }) => {
           age: actualAge,
           status: "Active",
           lastVisit: new Date().toISOString(),
-          nextAppointment: appointmentAPI.time,
+          nextAppointment: "",
         };
 
         const response = await patientAPI.create(patientData);
         const created = response.patient || response;
+        
+        toast({
+          title: "Patient Added Successfully!",
+          description: `${patientData.fullName} has been added to the system.`,
+        });
+        
         onSubmit(created);
         handleClose();
       } catch (error) {
         console.error('Failed to create patient:', error);
-        alert(`Failed to create patient: ${error.message}`);
+        toast({
+          title: "Error",
+          description: `Failed to create patient: ${error.message}`,
+          variant: "destructive",
+        });
       }
     }
   };
@@ -183,6 +221,7 @@ const PatientModal = ({ isOpen, onClose, onSubmit }) => {
       city: "",
       state: "",
       zipCode: "",
+      assignedDoctors: [],
       emergencyContact: {
         name: "",
         relationship: "",
@@ -268,6 +307,62 @@ const PatientModal = ({ isOpen, onClose, onSubmit }) => {
                   </SelectContent>
                 </Select>
                 {errors.gender && <p className="text-sm text-red-500 mt-1">{errors.gender}</p>}
+              </div>
+
+              <div>
+                <Label htmlFor="assignedDoctors">Assigned Doctors</Label>
+                <div className="space-y-2">
+                  <Select onValueChange={(value) => {
+                    if (value !== "none" && value !== "unavailable" && !formData.assignedDoctors.includes(value)) {
+                      handleInputChange("assignedDoctors", [...formData.assignedDoctors, value]);
+                    }
+                  }}>
+                    <SelectTrigger>
+                      <UserCheck className="w-4 h-4 mr-2" />
+                      <SelectValue placeholder={doctorsLoading ? "Loading doctors..." : "Select doctors (optional)"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No doctor assigned</SelectItem>
+                      {doctors && doctors.length > 0 ? (
+                        doctors.map((doctor) => (
+                          <SelectItem 
+                            key={doctor._id} 
+                            value={doctor._id}
+                            disabled={formData.assignedDoctors.includes(doctor._id)}
+                          >
+                            Dr. {doctor.fullName} - {doctor.specialty}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="unavailable" disabled>No doctors available</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  
+                  {/* Selected Doctors Display */}
+                  {formData.assignedDoctors.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {formData.assignedDoctors.map((doctorId) => {
+                        const doctor = doctors.find(d => d._id === doctorId);
+                        return doctor ? (
+                          <Badge key={doctorId} variant="secondary" className="gap-1">
+                            Dr. {doctor.fullName}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updatedDoctors = formData.assignedDoctors.filter(id => id !== doctorId);
+                                handleInputChange("assignedDoctors", updatedDoctors);
+                              }}
+                              className="ml-1 hover:text-red-500"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </Badge>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

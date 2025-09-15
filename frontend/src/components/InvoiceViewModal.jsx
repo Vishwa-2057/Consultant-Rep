@@ -61,12 +61,12 @@ ${invoice.patientId?.email || 'N/A'}
 
 SERVICES:
 ${invoice.items?.map(item => 
-  `${item.description} - Qty: ${item.quantity} x $${item.rate} = $${item.amount}`
+  `${item.description} - Qty: ${item.quantity} x ₹${item.rate} = ₹${item.amount}`
 ).join('\n') || 'No items listed'}
 
-SUBTOTAL: $${invoice.subtotal?.toFixed(2) || '0.00'}
-TAX: $${invoice.taxAmount?.toFixed(2) || '0.00'}
-TOTAL: $${invoice.total?.toFixed(2) || '0.00'}
+SUBTOTAL: ₹${invoice.subtotal?.toFixed(2) || '0.00'}
+TAX: ₹${invoice.taxAmount?.toFixed(2) || '0.00'}
+TOTAL: ₹${invoice.total?.toFixed(2) || '0.00'}
 
 STATUS: ${invoice.status}
 PAYMENT METHOD: ${invoice.paymentMethod || 'N/A'}
@@ -113,7 +113,7 @@ ${invoice.notes || 'No additional notes'}
                 {getStatusIcon(invoice.status)} {invoice.status}
               </Badge>
               <p className="text-2xl font-bold text-foreground">
-                ${Number(invoice.total || 0).toFixed(2)}
+                ₹{Number(invoice.total || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
               </p>
             </div>
           </div>
@@ -198,8 +198,8 @@ ${invoice.notes || 'No additional notes'}
                         <p className="font-medium">{item.description}</p>
                       </div>
                       <div className="col-span-2 text-center">{item.quantity}</div>
-                      <div className="col-span-2 text-right">${Number(item.rate || 0).toFixed(2)}</div>
-                      <div className="col-span-2 text-right font-medium">${Number(item.amount || 0).toFixed(2)}</div>
+                      <div className="col-span-2 text-right">₹{Number(item.rate || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                      <div className="col-span-2 text-right font-medium">₹{Number(item.amount || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
                     </div>
                   ))}
                 </div>
@@ -215,16 +215,16 @@ ${invoice.notes || 'No additional notes'}
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal:</span>
-                  <span className="font-medium">${Number(invoice.subtotal || 0).toFixed(2)}</span>
+                  <span className="font-medium">₹{Number(invoice.subtotal || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Tax ({invoice.taxRate || 0}%):</span>
-                  <span className="font-medium">${Number(invoice.taxAmount || 0).toFixed(2)}</span>
+                  <span className="font-medium">₹{Number(invoice.taxAmount || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total:</span>
-                  <span>${Number(invoice.total || 0).toFixed(2)}</span>
+                  <span>₹{Number(invoice.total || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                 </div>
               </div>
             </CardContent>

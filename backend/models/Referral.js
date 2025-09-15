@@ -147,7 +147,7 @@ const referralSchema = new mongoose.Schema({
   referringProvider: {
     name: {
       type: String,
-      default: 'Dr. Johnson',
+      required: [true, 'Referring provider name is required'],
       trim: true
     },
     npi: {
@@ -162,6 +162,12 @@ const referralSchema = new mongoose.Schema({
       type: String,
       trim: true
     }
+  },
+
+  // Referred By (Doctor who created the referral) - Optional
+  referredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Doctor'
   },
   
   // Additional Information

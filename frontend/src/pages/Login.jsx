@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { authAPI } from "@/services/api";
+import { authAPI, clinicAPI } from "@/services/api";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, Shield, ArrowLeft } from "lucide-react";
 
@@ -18,6 +18,7 @@ const Login = () => {
   const [otpSent, setOtpSent] = useState(false);
   const [otpTimer, setOtpTimer] = useState(0);
   const [activeTab, setActiveTab] = useState("password");
+  const [userType, setUserType] = useState("regular"); // "regular" or "clinic"
   const navigate = useNavigate();
 
   const handlePasswordLogin = async (e) => {
@@ -25,7 +26,13 @@ const Login = () => {
     setError("");
     setLoading(true);
     try {
-      const res = await authAPI.login({ email: email.trim(), password });
+      let res;
+      if (userType === "clinic") {
+        res = await clinicAPI.login({ email: email.trim(), password });
+      } else {
+        res = await authAPI.login({ email: email.trim(), password });
+      }
+      
       authAPI.setToken(res.token);
       localStorage.setItem('authToken', res.token);
       localStorage.setItem('authUser', JSON.stringify(res.user || res.doctor || {}));
@@ -106,13 +113,42 @@ const Login = () => {
           <CardDescription className="text-teal-700">Choose your preferred login method</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* User Type Selection */}
+          <div className="mb-6">
+            <Label className="text-sm font-medium text-teal-900 mb-3 block">Login as:</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={userType === "regular" ? "default" : "outline"}
+                onClick={() => setUserType("regular")}
+                className={`${userType === "regular" 
+                  ? "bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700" 
+                  : "border-teal-200 text-teal-700 hover:bg-teal-50"
+                }`}
+              >
+                Regular User
+              </Button>
+              <Button
+                type="button"
+                variant={userType === "clinic" ? "default" : "outline"}
+                onClick={() => setUserType("clinic")}
+                className={`${userType === "clinic" 
+                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700" 
+                  : "border-purple-200 text-purple-700 hover:bg-purple-50"
+                }`}
+              >
+                Clinic Admin
+              </Button>
+            </div>
+          </div>
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="password" className="flex items-center gap-2">
                 <Lock className="w-4 h-4" />
                 Password
               </TabsTrigger>
-              <TabsTrigger value="otp" className="flex items-center gap-2">
+              <TabsTrigger value="otp" className="flex items-center gap-2" disabled={userType === "clinic"}>
                 <Mail className="w-4 h-4" />
                 OTP
               </TabsTrigger>
@@ -145,10 +181,13 @@ const Login = () => {
                 {error && <p className="text-sm text-red-600">{error}</p>}
                 <Button 
                   type="submit" 
-                  className="w-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700" 
+                  className={`w-full ${userType === "clinic" 
+                    ? "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+                    : "bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700"
+                  }`}
                   disabled={loading}
                 >
-                  {loading ? 'Signing in...' : 'Sign In with Password'}
+                  {loading ? 'Signing in...' : `Sign In as ${userType === "clinic" ? "Clinic Admin" : "Regular User"}`}
                 </Button>
               </form>
             </TabsContent>
@@ -247,9 +286,9 @@ const Login = () => {
             </TabsContent>
           </Tabs>
 
-          <p className="text-sm text-teal-700 mt-6 text-center">
-            Don&apos;t have an account? <Link to="/register" className="text-teal-700 underline">Register</Link>
-          </p>
+          <div className="mt-6 text-center space-y-2">
+            {/* Removed clinic registration - clinic details fetched from database */}
+          </div>
         </CardContent>
       </Card>
     </div>

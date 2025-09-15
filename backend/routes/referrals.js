@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const Referral = require('../models/Referral');
 const Patient = require('../models/Patient');
 const emailService = require('../services/emailService');
+const auth = require('../middleware/auth');
 const router = express.Router();
 
 // Validation middleware
@@ -18,7 +19,7 @@ const validateReferral = [
 ];
 
 // GET /api/referrals - Get all referrals with filtering and pagination
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
     const {
       page = 1,
@@ -31,39 +32,142 @@ router.get('/', async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
-    // Build query
-    const query = {};
-    
-    if (status && status !== 'all') {
-      query.status = status;
-    }
-    
-    if (urgency && urgency !== 'all') {
-      query.urgency = urgency;
-    }
-    
-    if (specialty && specialty !== 'all') {
-      query.specialty = specialty;
-    }
-    
-    if (patientId) {
-      query.patientId = patientId;
-    }
+    let referrals;
+    let total;
 
-    // Build sort object
-    const sort = {};
-    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    if (req.user.role === 'doctor') {
+      // For doctors: use aggregation to filter by patient's assignedDoctors
+      const mongoose = require('mongoose');
+      
+      // Build match conditions for filtering
+      const matchConditions = {};
+      
+      if (status && status !== 'all') {
+        matchConditions.status = status;
+      }
+      
+      if (urgency && urgency !== 'all') {
+        matchConditions.urgency = urgency;
+      }
+      
+      if (specialty && specialty !== 'all') {
+        matchConditions.specialty = specialty;
+      }
+      
+      if (patientId) {
+        matchConditions.patientId = new mongoose.Types.ObjectId(patientId);
+      }
 
-    // Execute query with pagination
-    const referrals = await Referral.find(query)
-      .populate('patientId', 'fullName phone email')
-      .sort(sort)
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .select('-__v');
+      // Build sort object
+      const sortStage = {};
+      sortStage[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
-    // Get total count for pagination
-    const total = await Referral.countDocuments(query);
+      // Aggregation pipeline to join with patients and filter by assignedDoctors
+      const pipeline = [
+        { $match: matchConditions },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patient'
+          }
+        },
+        {
+          $match: {
+            'patient.assignedDoctors': new mongoose.Types.ObjectId(req.user.id)
+          }
+        },
+        {
+          $lookup: {
+            from: 'doctors',
+            localField: 'referredBy',
+            foreignField: '_id',
+            as: 'referredByDoctor'
+          }
+        },
+        {
+          $addFields: {
+            patientId: { $arrayElemAt: ['$patient', 0] },
+            referredBy: { $arrayElemAt: ['$referredByDoctor', 0] }
+          }
+        },
+        {
+          $project: {
+            'patient': 0,
+            'referredByDoctor': 0,
+            '__v': 0,
+            'patientId.assignedDoctors': 0,
+            'patientId.medicalHistory': 0,
+            'patientId.passwordHash': 0,
+            'referredBy.passwordHash': 0
+          }
+        },
+        { $sort: sortStage },
+        { $skip: (page - 1) * limit },
+        { $limit: parseInt(limit) }
+      ];
+
+      referrals = await Referral.aggregate(pipeline);
+
+      // Get total count for pagination
+      const countPipeline = [
+        { $match: matchConditions },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patient'
+          }
+        },
+        {
+          $match: {
+            'patient.assignedDoctors': new mongoose.Types.ObjectId(req.user.id)
+          }
+        },
+        { $count: 'total' }
+      ];
+
+      const countResult = await Referral.aggregate(countPipeline);
+      total = countResult.length > 0 ? countResult[0].total : 0;
+
+    } else {
+      // For super admins: use regular query (see all referrals)
+      const query = {};
+      
+      if (status && status !== 'all') {
+        query.status = status;
+      }
+      
+      if (urgency && urgency !== 'all') {
+        query.urgency = urgency;
+      }
+      
+      if (specialty && specialty !== 'all') {
+        query.specialty = specialty;
+      }
+      
+      if (patientId) {
+        query.patientId = patientId;
+      }
+
+      // Build sort object
+      const sort = {};
+      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+      // Execute query with pagination
+      referrals = await Referral.find(query)
+        .populate('patientId', 'fullName phone email')
+        .populate('referredBy', 'fullName specialty phone email')
+        .sort(sort)
+        .limit(limit * 1)
+        .skip((page - 1) * limit)
+        .select('-__v');
+
+      // Get total count for pagination
+      total = await Referral.countDocuments(query);
+    }
 
     res.json({
       referrals,
@@ -86,6 +190,7 @@ router.get('/:id', async (req, res) => {
   try {
     const referral = await Referral.findById(req.params.id)
       .populate('patientId', 'fullName phone email address')
+      .populate('referredBy', 'fullName specialty phone email')
       .select('-__v');
     
     if (!referral) {
@@ -103,7 +208,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/referrals - Create new referral
-router.post('/', validateReferral, async (req, res) => {
+router.post('/', auth, validateReferral, async (req, res) => {
   try {
     // Check for validation errors
     const errors = validationResult(req);
@@ -120,12 +225,31 @@ router.post('/', validateReferral, async (req, res) => {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-    // Create new referral
-    const referral = new Referral(req.body);
+    // Create new referral with optional referredBy field
+    const referralData = {
+      ...req.body
+    };
+
+    // Optionally populate referredBy and referringProvider if user is a doctor
+    if (req.user && req.user.id && req.user.role === 'doctor') {
+      const Doctor = require('../models/Doctor');
+      const loggedInDoctor = await Doctor.findById(req.user.id);
+      if (loggedInDoctor) {
+        referralData.referredBy = req.user.id;
+        referralData.referringProvider = {
+          name: loggedInDoctor.fullName,
+          phone: loggedInDoctor.phone || '',
+          email: loggedInDoctor.email || ''
+        };
+      }
+    }
+    
+    const referral = new Referral(referralData);
     await referral.save();
 
     const populatedReferral = await Referral.findById(referral._id)
-      .populate('patientId', 'fullName phone email');
+      .populate('patientId', 'fullName phone email')
+      .populate('referredBy', 'fullName specialty phone email');
 
     // Send email notification to appropriate doctor
     try {
@@ -181,6 +305,7 @@ router.put('/:id', validateReferral, async (req, res) => {
       { new: true, runValidators: true }
     )
     .populate('patientId', 'fullName phone email')
+    .populate('referredBy', 'fullName specialty phone email')
     .select('-__v');
 
     res.json({
@@ -224,7 +349,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // PATCH /api/referrals/:id/status - Update referral status
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', auth, async (req, res) => {
   try {
     const { status } = req.body;
     
@@ -232,7 +357,41 @@ router.patch('/:id/status', async (req, res) => {
       return res.status(400).json({ error: 'Valid status is required' });
     }
 
-    const referral = await Referral.findById(req.params.id);
+    // Find referral first to check authorization
+    let referral;
+    
+    if (req.user.role === 'doctor') {
+      // For doctors: use aggregation to check if they have access to this referral via assigned patients
+      const mongoose = require('mongoose');
+      
+      const pipeline = [
+        { $match: { _id: new mongoose.Types.ObjectId(req.params.id) } },
+        {
+          $lookup: {
+            from: 'patients',
+            localField: 'patientId',
+            foreignField: '_id',
+            as: 'patient'
+          }
+        },
+        {
+          $match: {
+            'patient.assignedDoctors': new mongoose.Types.ObjectId(req.user.id)
+          }
+        }
+      ];
+
+      const results = await Referral.aggregate(pipeline);
+      if (results.length === 0) {
+        return res.status(403).json({ error: 'Access denied: You can only update referrals for patients assigned to you' });
+      }
+      
+      referral = await Referral.findById(req.params.id);
+    } else {
+      // Super admins can update any referral
+      referral = await Referral.findById(req.params.id);
+    }
+
     if (!referral) {
       return res.status(404).json({ error: 'Referral not found' });
     }
@@ -242,7 +401,8 @@ router.patch('/:id/status', async (req, res) => {
     await referral.save();
 
     const updatedReferral = await Referral.findById(req.params.id)
-      .populate('patientId', 'fullName phone email');
+      .populate('patientId', 'fullName phone email')
+      .populate('referredBy', 'fullName specialty phone email');
 
     res.json({
       message: 'Referral status updated successfully',
@@ -258,12 +418,17 @@ router.patch('/:id/status', async (req, res) => {
 });
 
 // GET /api/referrals/stats/summary - Get referral statistics
-router.get('/stats/summary', async (req, res) => {
+router.get('/stats/summary', auth, async (req, res) => {
   try {
-    const totalReferrals = await Referral.countDocuments();
+    // Build base query for role-based filtering
+    const baseQuery = {};
+    // Remove referredBy filtering since it's now optional
     
-    // Get referrals by status
+    const totalReferrals = await Referral.countDocuments(baseQuery);
+    
+    // Get referrals by status with role filtering
     const statusStats = await Referral.aggregate([
+      { $match: baseQuery },
       {
         $group: {
           _id: '$status',
@@ -272,8 +437,9 @@ router.get('/stats/summary', async (req, res) => {
       }
     ]);
 
-    // Get referrals by urgency
+    // Get referrals by urgency with role filtering
     const urgencyStats = await Referral.aggregate([
+      { $match: baseQuery },
       {
         $group: {
           _id: '$urgency',
@@ -282,8 +448,9 @@ router.get('/stats/summary', async (req, res) => {
       }
     ]);
 
-    // Get referrals by specialty
+    // Get referrals by specialty with role filtering
     const specialtyStats = await Referral.aggregate([
+      { $match: baseQuery },
       {
         $group: {
           _id: '$specialty',

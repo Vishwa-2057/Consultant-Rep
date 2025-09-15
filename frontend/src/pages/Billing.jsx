@@ -320,7 +320,7 @@ const Billing = () => {
     
     toast({
       title: "Invoice Generated!",
-      description: `Successfully created invoice ${invoiceData.invoiceNumber} for ${patientName} - $${totalAmount}`,
+      description: `Successfully created invoice ${invoiceData.invoiceNumber} for ${patientName} - ₹${totalAmount}`,
       variant: "default",
     });
     
@@ -363,7 +363,7 @@ const Billing = () => {
       let y = 15;
       const pageHeight = doc.internal.pageSize.getHeight();
       const lineHeight = 8;
-      const money = (val) => `$${Number(val || 0).toFixed(2)}`;
+      const money = (val) => `₹${Number(val || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
       const ensureSpace = (needed = lineHeight) => {
         if (y + needed > pageHeight - 15) { doc.addPage(); y = 15; }
       };
@@ -480,7 +480,7 @@ const Billing = () => {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {statsLoading ? 'Loading...' : `$${revenueStats.totalRevenue.toLocaleString()}`}
+                  {statsLoading ? 'Loading...' : `₹${revenueStats.totalRevenue.toLocaleString('en-IN')}`}
                 </p>
                 <p className="text-sm text-success">All paid invoices</p>
               </div>
@@ -514,7 +514,7 @@ const Billing = () => {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Outstanding</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {statsLoading ? 'Loading...' : `$${revenueStats.outstandingAmount.toLocaleString()}`}
+                  {statsLoading ? 'Loading...' : `₹${revenueStats.outstandingAmount.toLocaleString('en-IN')}`}
                 </p>
                 <p className="text-sm text-destructive">Overdue invoices</p>
               </div>
@@ -531,7 +531,7 @@ const Billing = () => {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Paid This Month</p>
                 <p className="text-2xl font-bold text-foreground">
-                  {statsLoading ? 'Loading...' : `$${revenueStats.paidThisMonth.toLocaleString()}`}
+                  {statsLoading ? 'Loading...' : `₹${revenueStats.paidThisMonth.toLocaleString('en-IN')}`}
                 </p>
                 <p className="text-sm text-success">Current month payments</p>
               </div>
@@ -623,7 +623,7 @@ const Billing = () => {
                           
                           <div className="flex items-center space-x-4">
                             <div className="text-right">
-                              <p className="text-lg font-bold text-foreground">${invoice.total?.toFixed ? invoice.total.toFixed(2) : Number(invoice.total || 0).toFixed(2)}</p>
+                              <p className="text-lg font-bold text-foreground">₹{invoice.total?.toFixed ? invoice.total.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : Number(invoice.total || 0).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                               <Badge variant={getStatusColor(invoice.status)} className="mt-1">
                                 <StatusIcon className="w-3 h-3 mr-1" />
                                 {invoice.status}
@@ -685,7 +685,7 @@ const Billing = () => {
                         
                         <div className="flex items-center space-x-4">
                           <div className="text-right">
-                            <p className="text-lg font-bold text-foreground">${approval.amount}</p>
+                            <p className="text-lg font-bold text-foreground">₹{Number(approval.amount).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                             <Badge variant="warning">Sent</Badge>
                           </div>
                           <div className="flex space-x-2">
@@ -734,7 +734,7 @@ const Billing = () => {
                       monthlyRevenue.map((data, index) => (
                         <div key={index} className="flex justify-between items-center">
                           <span>{data.month}</span>
-                          <span className="font-semibold">${data.revenue.toLocaleString()}</span>
+                          <span className="font-semibold">₹{data.revenue.toLocaleString('en-IN')}</span>
                         </div>
                       ))
                     ) : (
@@ -759,7 +759,7 @@ const Billing = () => {
                       paymentMethods.map((data, index) => (
                         <div key={index} className="flex justify-between items-center">
                           <span>{data.method}</span>
-                          <span className="font-semibold">${data.amount.toLocaleString()} ({data.percentage}%)</span>
+                          <span className="font-semibold">₹{data.amount.toLocaleString('en-IN')} ({data.percentage}%)</span>
                         </div>
                       ))
                     ) : (

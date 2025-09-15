@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Patient = require('../models/Patient');
+const auth = require('../middleware/auth');
 const router = express.Router();
 
 // Validation middleware
@@ -17,7 +18,7 @@ const validatePatient = [
 ];
 
 // GET /api/patients - Get all patients with pagination and filtering
-router.get('/', async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
     const {
       page = 1,
@@ -30,6 +31,11 @@ router.get('/', async (req, res) => {
 
     // Build query
     const query = {};
+    
+    // Role-based filtering: doctors can only see patients assigned to them
+    if (req.user.role === 'doctor') {
+      query.assignedDoctors = req.user.id;
+    }
     
     if (search) {
       query.$or = [
@@ -52,7 +58,8 @@ router.get('/', async (req, res) => {
       .sort(sort)
       .limit(limit * 1)
       .skip((page - 1) * limit)
-      .select('-__v');
+      .select('-__v')
+      .populate('assignedDoctors', 'fullName specialty');
 
     // Get total count for pagination
     const total = await Patient.countDocuments(query);
@@ -74,9 +81,18 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/patients/:id - Get patient by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', auth, async (req, res) => {
   try {
-    const patient = await Patient.findById(req.params.id).select('-__v');
+    const query = { _id: req.params.id };
+    
+    // Role-based filtering: doctors can only see patients assigned to them
+    if (req.user.role === 'doctor') {
+      query.assignedDoctors = req.user.id;
+    }
+    
+    const patient = await Patient.findOne(query)
+      .select('-__v')
+      .populate('assignedDoctors', 'fullName specialty');
     
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
@@ -93,7 +109,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/patients - Create new patient
-router.post('/', validatePatient, async (req, res) => {
+router.post('/', auth, validatePatient, async (req, res) => {
   try {
     // Check for validation errors
     const errors = validationResult(req);
@@ -131,7 +147,7 @@ router.post('/', validatePatient, async (req, res) => {
 });
 
 // PUT /api/patients/:id - Update patient
-router.put('/:id', validatePatient, async (req, res) => {
+router.put('/:id', auth, validatePatient, async (req, res) => {
   try {
     // Check for validation errors
     const errors = validationResult(req);
@@ -186,7 +202,7 @@ router.put('/:id', validatePatient, async (req, res) => {
 });
 
 // DELETE /api/patients/:id - Delete patient
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', auth, async (req, res) => {
   try {
     const patient = await Patient.findById(req.params.id);
     
@@ -207,7 +223,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // PATCH /api/patients/:id/status - Update patient status
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', auth, async (req, res) => {
   try {
     const { status } = req.body;
     
@@ -238,15 +254,26 @@ router.patch('/:id/status', async (req, res) => {
 });
 
 // GET /api/patients/stats/summary - Get patient statistics
-router.get('/stats/summary', async (req, res) => {
+router.get('/stats/summary', auth, async (req, res) => {
   try {
-    const totalPatients = await Patient.countDocuments();
-    const activePatients = await Patient.countDocuments({ status: 'Active' });
-    const followUpPatients = await Patient.countDocuments({ status: 'Follow-up' });
-    const completedPatients = await Patient.countDocuments({ status: 'Completed' });
+    // Build base query for role-based filtering
+    const baseQuery = {};
+    if (req.user.role === 'doctor') {
+      baseQuery.assignedDoctors = req.user.id;
+    }
     
-    // Get patients by age groups
+    const totalPatients = await Patient.countDocuments(baseQuery);
+    const activePatients = await Patient.countDocuments({ ...baseQuery, status: 'Active' });
+    const followUpPatients = await Patient.countDocuments({ ...baseQuery, status: 'Follow-up' });
+    const completedPatients = await Patient.countDocuments({ ...baseQuery, status: 'Completed' });
+    
+    // Get patients by age groups with role-based filtering
+    const matchStage = req.user.role === 'doctor' 
+      ? { $match: { assignedDoctors: req.user.id } }
+      : { $match: {} };
+    
     const ageGroups = await Patient.aggregate([
+      matchStage,
       {
         $group: {
           _id: {
@@ -281,7 +308,7 @@ router.get('/stats/summary', async (req, res) => {
 });
 
 // GET /api/patients/search/quick - Quick search patients
-router.get('/search/quick', async (req, res) => {
+router.get('/search/quick', auth, async (req, res) => {
   try {
     const { q } = req.query;
     
@@ -289,13 +316,20 @@ router.get('/search/quick', async (req, res) => {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
     }
 
-    const patients = await Patient.find({
+    const query = {
       $or: [
         { fullName: { $regex: q, $options: 'i' } },
         { phone: { $regex: q, $options: 'i' } },
         { email: { $regex: q, $options: 'i' } }
       ]
-    })
+    };
+
+    // Role-based filtering: doctors can only see patients assigned to them
+    if (req.user.role === 'doctor') {
+      query.assignedDoctors = req.user.id;
+    }
+
+    const patients = await Patient.find(query)
     .select('fullName phone email status age')
     .limit(10);
 

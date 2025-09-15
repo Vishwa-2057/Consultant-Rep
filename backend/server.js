@@ -22,6 +22,8 @@ const complianceAlertRoutes = require('./routes/complianceAlerts');
 const otpRoutes = require('./routes/otp');
 const emailConfigRoutes = require('./routes/emailConfig');
 const doctorRoutes = require('./routes/doctors');
+const nurseRoutes = require('./routes/nurses');
+const superAdminRoutes = require('./routes/superadmin');
 
 // Middleware
 app.use(helmet());
@@ -30,9 +32,11 @@ app.use(morgan('combined'));
 
 // CORS configuration
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:8080',
+  process.env.FRONTEND_URL || 'http://localhost:8000',
   'http://localhost:5173',
+  'http://localhost:8080',
   'http://localhost:8081',
+  'http://127.0.0.1:8000',
   'http://127.0.0.1:8080',
   'http://127.0.0.1:8081',
   'http://127.0.0.1:5173'
@@ -43,8 +47,8 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    // Allow all localhost origins for development
-    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+    // Allow all localhost and local network origins for development
+    if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('192.168.')) {
       return callback(null, true);
     }
     
@@ -99,6 +103,8 @@ app.use('/api/compliance-alerts', complianceAlertRoutes);
 app.use('/api/otp', otpRoutes);
 app.use('/api/email-config', emailConfigRoutes);
 app.use('/api/doctors', doctorRoutes);
+app.use('/api/nurses', nurseRoutes);
+app.use('/api/superadmin', superAdminRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

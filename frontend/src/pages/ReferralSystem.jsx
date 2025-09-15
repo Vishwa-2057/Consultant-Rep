@@ -21,8 +21,10 @@ import {
   Calendar,
   CheckCircle,
   AlertCircle,
-  Loader2
+  Loader2,
+  Download
 } from "lucide-react";
+import { generateReferralPDF } from "@/utils/pdfGenerator";
 
 const ReferralSystem = () => {
   const { toast } = useToast();
@@ -157,6 +159,23 @@ const ReferralSystem = () => {
       toast({
         title: "Error",
         description: "Failed to complete referral. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadReferralPDF = (referral, type) => {
+    try {
+      generateReferralPDF(referral, type);
+      toast({
+        title: "Success",
+        description: "Referral PDF downloaded successfully!",
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
         variant: "destructive",
       });
     }
@@ -413,7 +432,7 @@ const ReferralSystem = () => {
                 {filteredOutbound.map((referral) => {
                   const PriorityIcon = getPriorityIcon(referral.urgency);
                   return (
-                    <div key={referral.id} className="p-4 rounded-lg border border-border hover:bg-muted/30 transition-colors">
+                    <div key={referral._id || referral.id} className="p-4 rounded-lg border border-border hover:bg-muted/30 transition-colors">
                       <div className="flex items-start justify-between">
                         <div className="flex items-start space-x-4">
                           <div className="w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center">
@@ -473,8 +492,13 @@ const ReferralSystem = () => {
                             <Button variant="ghost" size="sm">
                               <Phone className="w-4 h-4" />
                             </Button>
-                            <Button variant="ghost" size="sm">
-                              <FileText className="w-4 h-4" />
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleDownloadReferralPDF(referral, 'outbound')}
+                              title="Download Referral PDF"
+                            >
+                              <Download className="w-4 h-4" />
                             </Button>
                             <ReferralButton 
                               referralData={referral}
@@ -504,7 +528,7 @@ const ReferralSystem = () => {
                 {filteredInbound.map((referral) => {
                   const PriorityIcon = getPriorityIcon(referral.urgency);
                   return (
-                    <div key={referral.id} className="p-4 rounded-lg border border-border hover:bg-muted/30 transition-colors">
+                    <div key={referral._id || referral.id} className="p-4 rounded-lg border border-border hover:bg-muted/30 transition-colors">
                       <div className="flex items-start justify-between">
                         <div className="flex items-start space-x-4">
                           <div className="w-12 h-12 bg-secondary rounded-full flex items-center justify-center">
@@ -564,8 +588,13 @@ const ReferralSystem = () => {
                             <Button variant="outline" size="sm">
                               Accept
                             </Button>
-                            <Button variant="ghost" size="sm">
-                              <Calendar className="w-4 h-4" />
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleDownloadReferralPDF(referral, 'inbound')}
+                              title="Download Referral PDF"
+                            >
+                              <Download className="w-4 h-4" />
                             </Button>
                             <ReferralButton 
                               referralData={referral}

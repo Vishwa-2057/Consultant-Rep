@@ -2,33 +2,69 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { 
+  Users, 
+  Calendar, 
+  Activity, 
+  TrendingUp, 
+  Clock, 
+  Plus,
+  Phone,
+  Video,
+  MessageCircle,
+  User,
+  Heart,
+  Stethoscope,
+  AlertTriangle,
+  CheckCircle,
+  ArrowUpRight,
+  ArrowDownRight,
+  ArrowRight,
+  CalendarDays,
+  MapPin,
+  Check
+} from "lucide-react";
+import AppointmentModal from "@/components/AppointmentModal";
+import AppointmentViewModal from '../components/AppointmentViewModal';
+import ComplianceAlertModal from '../components/ComplianceAlertModal';
+import Carousel from "@/components/Carousel";
+import { getCurrentUser } from "@/utils/roleUtils";
+
+// Import lab images
+import labPhoto1 from "@/assets/Images/labphoto1.jpg";
+import labPhoto2 from "@/assets/Images/labphoto2.jpg";
+import labPhoto3 from "@/assets/Images/labphoto3.jpg";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Users, 
-  Calendar, 
-  AlertTriangle, 
-  TrendingUp, 
-  Clock, 
-  CheckCircle,
-  Plus,
-  ArrowRight,
-  CalendarDays,
-  User,
-  MapPin
-} from "lucide-react";
-import AppointmentModal from "@/components/AppointmentModal";
 import { useToast } from "@/hooks/use-toast";
-import { appointmentAPI, patientAPI, complianceAlertAPI, invoiceAPI } from "@/services/api";
+import { patientAPI, appointmentAPI, consultationAPI, complianceAlertAPI, invoiceAPI } from "@/services/api";
  
 import { Link } from "react-router-dom";
 
 const Dashboard = () => {
+  // Get current user from localStorage
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const raw = localStorage.getItem('authUser');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
+  const [isAppointmentViewModalOpen, setIsAppointmentViewModalOpen] = useState(false);
+  const [isComplianceAlertModalOpen, setIsComplianceAlertModalOpen] = useState(false);
   const [appointments, setAppointments] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [recentPatients, setRecentPatients] = useState([]);
@@ -40,8 +76,32 @@ const Dashboard = () => {
   const [monthlyRevenue, setMonthlyRevenue] = useState(0);
   const [monthlyRevenueChange, setMonthlyRevenueChange] = useState("+0%");
   const [monthlyRevenueLoading, setMonthlyRevenueLoading] = useState(true);
+  const [complianceRate, setComplianceRate] = useState(94.2);
+  const [complianceRateLoading, setComplianceRateLoading] = useState(true);
   
   const { toast } = useToast();
+
+  // Carousel images data
+  const carouselImages = [
+    {
+      src: labPhoto1,
+      alt: "Modern Laboratory Equipment",
+      caption: "State-of-the-Art Laboratory",
+      description: "Advanced diagnostic equipment for accurate results"
+    },
+    {
+      src: labPhoto2,
+      alt: "Medical Research Facility",
+      caption: "Research & Development",
+      description: "Cutting-edge research for better healthcare solutions"
+    },
+    {
+      src: labPhoto3,
+      alt: "Healthcare Technology",
+      caption: "Digital Healthcare",
+      description: "Innovative technology improving patient care"
+    }
+  ];
 
   // Load appointments from API when component mounts
   useEffect(() => {
@@ -147,7 +207,25 @@ const Dashboard = () => {
     loadMonthlyRevenue();
   }, []);
 
-  const stats = [
+  // Load compliance rate
+  useEffect(() => {
+    const loadComplianceRate = async () => {
+      setComplianceRateLoading(true);
+      try {
+        const rate = await complianceAlertAPI.getComplianceRate();
+        setComplianceRate(rate);
+      } catch (error) {
+        console.error('Failed to load compliance rate:', error);
+        setComplianceRate(94.2); // Fallback to default
+      } finally {
+        setComplianceRateLoading(false);
+      }
+    };
+    loadComplianceRate();
+  }, []);
+
+  // Base stats available to all users
+  const baseStats = [
     {
       title: "Total Patients",
       value: totalPatientsLoading ? "…" : totalPatients.toLocaleString(),
@@ -164,19 +242,24 @@ const Dashboard = () => {
     },
     {
       title: "Compliance Rate",
-      value: "94.2%",
-      change: "+2.1%",
+      value: complianceRateLoading ? "…" : `${complianceRate}%`,
       icon: CheckCircle,
       color: "text-success"
-    },
+    }
+  ];
+
+  // Revenue stat only for clinic admins
+  const revenueStats = (currentUser?.role === 'clinic' || currentUser?.isClinic) ? [
     {
       title: "Revenue (Month)",
-      value: monthlyRevenueLoading ? "…" : `$${monthlyRevenue.toLocaleString()}`,
+      value: monthlyRevenueLoading ? "…" : `₹${monthlyRevenue.toLocaleString('en-IN')}`,
       change: monthlyRevenueChange,
       icon: TrendingUp,
       color: "text-warning"
     }
-  ];
+  ] : [];
+
+  const stats = [...baseStats, ...revenueStats];
 
   // recentPatients are now loaded from the API
 
@@ -188,6 +271,7 @@ const Dashboard = () => {
   const [patients, setPatients] = useState([]);
   const [patientsLoading, setPatientsLoading] = useState(false);
   const [submittingAlert, setSubmittingAlert] = useState(false);
+  const [solvingAlerts, setSolvingAlerts] = useState(new Set());
 
   // Load compliance alerts from API
   useEffect(() => {
@@ -297,6 +381,44 @@ const Dashboard = () => {
     }
   };
 
+  // Handle solving compliance alert
+  const handleSolveAlert = async (alertId) => {
+    setSolvingAlerts(prev => new Set([...prev, alertId]));
+    
+    try {
+      await complianceAlertAPI.resolve(alertId, 'Marked as solved from dashboard');
+      
+      // Remove the solved alert from the list
+      setAlerts(prev => prev.filter(alert => alert._id !== alertId));
+      
+      // Refresh compliance rate since solving an alert changes the calculation
+      try {
+        const rate = await complianceAlertAPI.getComplianceRate();
+        setComplianceRate(rate);
+      } catch (error) {
+        console.error('Failed to refresh compliance rate:', error);
+      }
+      
+      toast({ 
+        title: "Alert Solved", 
+        description: "Compliance alert has been marked as solved and removed from the dashboard." 
+      });
+    } catch (error) {
+      console.error('Failed to solve compliance alert:', error);
+      toast({ 
+        title: "Error", 
+        description: "Failed to solve compliance alert. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setSolvingAlerts(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(alertId);
+        return newSet;
+      });
+    }
+  };
+
   const getPriorityColor = (priority) => {
     switch (priority) {
       case "High": return "destructive";
@@ -326,14 +448,21 @@ const Dashboard = () => {
   };
 
   const formatAppointmentTime = (date, time) => {
+    if (!date || !time) return "Invalid date";
+    
     const appointmentDate = new Date(`${date}T${time}`);
     const now = new Date();
+    
+    // Check if the date is valid
+    if (isNaN(appointmentDate.getTime())) return "Invalid date";
+    
     const diffTime = appointmentDate - now;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
     if (diffDays < 0) return "Past";
     if (diffDays === 0) return "Today";
     if (diffDays === 1) return "Tomorrow";
+    if (isNaN(diffDays)) return "Invalid date";
     return `${diffDays} days`;
   };
 
@@ -351,6 +480,7 @@ const Dashboard = () => {
 
   // Modal handlers
   const handleNewAppointment = () => setIsAppointmentModalOpen(true);
+  const handleViewAppointments = () => setIsAppointmentViewModalOpen(true);
 
   // Form submission handlers
   const handleAppointmentSubmit = (appointmentData) => {
@@ -376,6 +506,17 @@ const Dashboard = () => {
 
   // Modal close handlers
   const handleAppointmentModalClose = () => setIsAppointmentModalOpen(false);
+  const handleAppointmentViewModalClose = () => {
+    setIsAppointmentViewModalOpen(false);
+  };
+
+  const handleViewComplianceAlerts = () => {
+    setIsComplianceAlertModalOpen(true);
+  };
+
+  const handleComplianceAlertModalClose = () => {
+    setIsComplianceAlertModalOpen(false);
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -383,7 +524,7 @@ const Dashboard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back, Dr. Johnson. Here's your overview.</p>
+          <p className="text-muted-foreground">Welcome back, {currentUser?.name || currentUser?.fullName || 'User'}. Here's your overview.</p>
         </div>
         <Button 
           className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 shadow-lg shadow-teal-500/25" 
@@ -394,8 +535,17 @@ const Dashboard = () => {
         </Button>
       </div>
 
+      {/* Carousel Section */}
+      <div className="mb-6">
+        <Carousel images={carouselImages} autoPlay={true} interval={4000} />
+      </div>
+
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className={`grid gap-6 ${
+        currentUser?.role === 'doctor' 
+          ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 max-w-4xl mx-auto' 
+          : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
+      }`}>
         {stats.map((stat, index) => (
           <Card key={index} className="border-0 shadow-soft hover:shadow-medical transition-all duration-200">
             <CardContent className="p-6">
@@ -467,8 +617,8 @@ const Dashboard = () => {
                 <CalendarDays className="w-5 h-5 text-secondary" />
                 Upcoming Appointments
               </span>
-              <Button variant="ghost" size="sm" asChild>
-                <Link to="/teleconsultation">View All <ArrowRight className="w-4 h-4 ml-1" /></Link>
+              <Button variant="ghost" size="sm" onClick={handleViewAppointments}>
+                View All <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
             </CardTitle>
             <CardDescription>Your scheduled appointments and meetings</CardDescription>
@@ -487,7 +637,6 @@ const Dashboard = () => {
               )}
               {appointments.slice(0, 3).map((appointment, index) => {
                 const priority = getAppointmentPriority(appointment.date, appointment.time);
-                const timeUntil = formatAppointmentTime(appointment.date, appointment.time);
                 const patientName = appointment.patientId?.fullName || appointment.patientName || 'Unknown Patient';
                 
                 return (
@@ -526,14 +675,6 @@ const Dashboard = () => {
                           </>
                         )}
                       </div>
-                      <span className={`text-xs font-medium truncate ml-2 ${
-                        priority === 'urgent' ? 'text-red-600' :
-                        priority === 'soon' ? 'text-yellow-600' :
-                        priority === 'past' ? 'text-gray-500' :
-                        'text-muted-foreground'
-                      }`}>
-                        {timeUntil}
-                      </span>
                     </div>
                   </div>
                 );
@@ -551,8 +692,8 @@ const Dashboard = () => {
                 Compliance Alerts
               </span>
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" asChild>
-                  <Link to="/billing">View All <ArrowRight className="w-4 h-4 ml-1" /></Link>
+                <Button variant="ghost" size="sm" onClick={handleViewComplianceAlerts}>
+                  View All <ArrowRight className="w-4 h-4 ml-1" />
                 </Button>
                 <Button variant="outline" size="sm" onClick={openAlertModal}>Add Alert</Button>
               </div>
@@ -575,9 +716,30 @@ const Dashboard = () => {
                 <div key={alert._id || index} className="p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors">
                   <div className="flex items-start justify-between mb-2">
                     <span className="text-sm font-medium text-muted-foreground truncate">{alert.type}</span>
-                    <Badge variant={getPriorityColor(alert.priority)} className="text-xs flex-shrink-0 ml-2">
-                      {alert.priority}
-                    </Badge>
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                      <Badge variant={getPriorityColor(alert.priority)} className="text-xs">
+                        {alert.priority}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 text-xs bg-green-50 hover:bg-green-100 border-green-200 text-green-700 hover:text-green-800"
+                        onClick={() => handleSolveAlert(alert._id)}
+                        disabled={solvingAlerts.has(alert._id)}
+                      >
+                        {solvingAlerts.has(alert._id) ? (
+                          <>
+                            <Clock className="w-3 h-3 mr-1 animate-spin" />
+                            Solving...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-3 h-3 mr-1" />
+                            Solved
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                   <p className="font-medium text-foreground mb-1 truncate">{alert.patientName}</p>
                   <p className="text-sm text-muted-foreground line-clamp-2">{alert.message}</p>
@@ -593,6 +755,18 @@ const Dashboard = () => {
         isOpen={isAppointmentModalOpen}
         onClose={handleAppointmentModalClose}
         onSubmit={handleAppointmentSubmit}
+      />
+
+      {/* Appointment View Modal */}
+      <AppointmentViewModal
+        isOpen={isAppointmentViewModalOpen}
+        onClose={handleAppointmentViewModalClose}
+      />
+
+      {/* Compliance Alert Modal */}
+      <ComplianceAlertModal
+        isOpen={isComplianceAlertModalOpen}
+        onClose={handleComplianceAlertModalClose}
       />
 
       {/* Add Compliance Alert Modal */}

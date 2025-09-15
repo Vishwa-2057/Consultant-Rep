@@ -3,6 +3,8 @@ const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Doctor = require('../models/Doctor');
+const Nurse = require('../models/Nurse');
+const Clinic = require('../models/Clinic');
 const OTP = require('../models/OTP');
 const emailService = require('../services/emailService');
 
@@ -77,26 +79,49 @@ router.post('/login', loginValidation, async (req, res) => {
     }
 
     const { email, password } = req.body;
-    const doctor = await Doctor.findOne({ email });
-    if (!doctor) {
+    
+    // Try to find user in Doctor collection first
+    let user = await Doctor.findOne({ email });
+    let userType = 'doctor';
+    
+    // If not found in Doctor, try Nurse collection
+    if (!user) {
+      user = await Nurse.findOne({ email });
+      userType = 'nurse';
+    }
+    
+    // If not found in Nurse, try Clinic collection
+    if (!user) {
+      user = await Clinic.findOne({ 
+        $or: [
+          { email: email },
+          { adminEmail: email },
+          { adminUsername: email }
+        ]
+      });
+      userType = 'clinic';
+    }
+    
+    if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const ok = await doctor.comparePassword(password);
+    const ok = await user.comparePassword(password);
     if (!ok) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ id: doctor._id, role: doctor.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user._id, role: user.role || userType }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({
       message: 'Login successful',
       token,
       user: {
-        id: doctor._id,
-        fullName: doctor.fullName,
-        email: doctor.email,
-        specialty: doctor.specialty,
-        role: doctor.role,
+        id: user._id,
+        fullName: user.fullName,
+        name: user.name,
+        email: user.email,
+        specialty: user.specialty || user.department,
+        role: user.role || userType,
       }
     });
   } catch (err) {
@@ -119,9 +144,16 @@ router.post('/request-otp', requestOTPValidation, async (req, res) => {
 
     const { email } = req.body;
 
-    // Check if doctor exists
-    const doctor = await Doctor.findOne({ email });
-    if (!doctor) {
+    // Check if user exists (doctor, nurse, or clinic)
+    let user = await Doctor.findOne({ email });
+    if (!user) {
+      user = await Nurse.findOne({ email });
+    }
+    if (!user) {
+      user = await Clinic.findOne({ email });
+    }
+    
+    if (!user) {
       return res.status(404).json({ 
         success: false,
         error: 'No account found with this email address' 
@@ -147,13 +179,13 @@ router.post('/request-otp', requestOTPValidation, async (req, res) => {
     const otp = await OTP.createOTP(
       email,
       'login',
-      doctor._id,
+      user._id,
       req.ip,
       req.get('User-Agent')
     );
 
-    // Send email using doctor's email configuration
-    const emailResult = await emailService.sendOTPEmail(doctor._id, email, otp.code, 'login');
+    // Send email using user's email configuration
+    const emailResult = await emailService.sendOTPEmail(user._id, email, otp.code, 'login');
 
     if (!emailResult.success) {
       // If email fails, delete the OTP
@@ -208,12 +240,19 @@ router.post('/login-otp', otpLoginValidation, async (req, res) => {
 
     const { otp: otpRecord } = verificationResult;
 
-    // Get doctor information
-    const doctor = await Doctor.findById(otpRecord.userId);
-    if (!doctor) {
+    // Get user information (doctor, nurse, or clinic)
+    let user = await Doctor.findById(otpRecord.userId);
+    if (!user) {
+      user = await Nurse.findById(otpRecord.userId);
+    }
+    if (!user) {
+      user = await Clinic.findById(otpRecord.userId);
+    }
+    
+    if (!user) {
       return res.status(404).json({
         success: false,
-        error: 'Doctor account not found'
+        error: 'User account not found'
       });
     }
 
@@ -222,7 +261,7 @@ router.post('/login-otp', otpLoginValidation, async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { id: doctor._id, role: doctor.role }, 
+      { id: user._id, role: user.role || (user.specialty ? 'doctor' : user.isClinic ? 'clinic' : 'nurse') }, 
       process.env.JWT_SECRET, 
       { expiresIn: '7d' }
     );
@@ -232,11 +271,11 @@ router.post('/login-otp', otpLoginValidation, async (req, res) => {
       message: 'Login successful',
       token,
       user: {
-        id: doctor._id,
-        fullName: doctor.fullName,
-        email: doctor.email,
-        specialty: doctor.specialty,
-        role: doctor.role,
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        specialty: user.specialty || user.department || user.organization,
+        role: user.role || (user.specialty ? 'doctor' : user.isClinic ? 'clinic' : 'nurse'),
       }
     });
   } catch (err) {
@@ -254,9 +293,22 @@ router.get('/me', async (req, res) => {
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
     if (!token) return res.status(401).json({ error: 'Missing token' });
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    const doctor = await Doctor.findById(payload.id).select('-passwordHash');
-    if (!doctor) return res.status(401).json({ error: 'Invalid token' });
-    res.json({ user: doctor });
+    
+    // Try to find user in Doctor collection first
+    let user = await Doctor.findById(payload.id).select('-passwordHash');
+    
+    // If not found in Doctor, try Nurse collection
+    if (!user) {
+      user = await Nurse.findById(payload.id).select('-passwordHash');
+    }
+    
+    // If not found in Nurse, try Clinic collection
+    if (!user) {
+      user = await Clinic.findById(payload.id).select('-passwordHash');
+    }
+    
+    if (!user) return res.status(401).json({ error: 'Invalid token' });
+    res.json({ user });
   } catch (err) {
     console.error('Me error:', err);
     res.status(401).json({ error: 'Invalid token' });

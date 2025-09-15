@@ -12,6 +12,16 @@ export function Layout({ children }) {
   const hideActions = ['/login','/register'].includes(location.pathname);
   const isAuthPage = hideActions;
   
+  // Get current user from localStorage
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const raw = localStorage.getItem('authUser');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+  
   // Dark mode state
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -31,6 +41,21 @@ export function Layout({ children }) {
     localStorage.setItem('darkMode', isDarkMode.toString());
   }, [isDarkMode]);
 
+  // Listen for auth changes
+  useEffect(() => {
+    const handleAuthChanged = () => {
+      try {
+        const raw = localStorage.getItem('authUser');
+        setCurrentUser(raw ? JSON.parse(raw) : null);
+      } catch {
+        setCurrentUser(null);
+      }
+    };
+
+    window.addEventListener('auth-changed', handleAuthChanged);
+    return () => window.removeEventListener('auth-changed', handleAuthChanged);
+  }, []);
+
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
   };
@@ -41,8 +66,10 @@ export function Layout({ children }) {
     const titleMap = {
       '/': '',
       '/dashboard': '',
-      '/patients': 'Patient Management',
       '/teleconsultation': 'Teleconsultation',
+      '/patients': 'Patient Management',
+      '/doctors': 'Doctors Management',
+      '/nurses': 'Nurses Management',
       '/referrals': 'Referral System',
       '/billing': 'Billing & Invoices',
       '/community': 'Community Hub',
@@ -108,40 +135,40 @@ export function Layout({ children }) {
       <div className="h-screen flex w-full bg-background overflow-hidden">
         <ConsultantSidebar />
         
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
           {/* Header */}
-          <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger className="lg:hidden" />
-              <div className="flex items-center gap-4">
+          <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6 flex-shrink-0">
+            <div className="flex items-center gap-4 min-w-0">
+              <SidebarTrigger className="lg:hidden flex-shrink-0" />
+              <div className="flex items-center gap-4 min-w-0">
                 {getPageTitle() && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <h1 className="text-xl font-semibold text-foreground">{getPageTitle()}</h1>
                   </div>
                 )}
-                <div className="hidden md:flex items-center gap-3 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
+                <div className="hidden lg:flex items-center gap-3 text-sm text-muted-foreground min-w-0">
+                  <div className="flex items-center gap-1 flex-shrink-0">
                     <User className="w-4 h-4" />
-                    <span>Dr. Johnson</span>
+                    <span>{currentUser?.name || currentUser?.fullName || 'User'}</span>
                   </div>
-                  <div className="w-1 h-1 bg-muted-foreground rounded-full"></div>
-                  <div className="font-mono">
+                  <div className="w-1 h-1 bg-muted-foreground rounded-full flex-shrink-0"></div>
+                  <div className="font-mono flex-shrink-0">
                     {currentTime.toLocaleTimeString('en-US', { 
                       hour: '2-digit', 
                       minute: '2-digit',
                       hour12: true 
                     })}
                   </div>
-                  <div className="w-1 h-1 bg-muted-foreground rounded-full"></div>
-                  <div>
+                  <div className="w-1 h-1 bg-muted-foreground rounded-full flex-shrink-0"></div>
+                  <div className="flex-shrink-0">
                     {currentTime.toLocaleDateString('en-US', { 
                       weekday: 'short',
                       month: 'short', 
                       day: 'numeric' 
                     })}
                   </div>
-                  <div className="w-1 h-1 bg-muted-foreground rounded-full"></div>
-                  <div className="text-xs italic text-muted-foreground/70 max-w-xs truncate">
+                  <div className="w-1 h-1 bg-muted-foreground rounded-full flex-shrink-0"></div>
+                  <div className="text-xs italic text-muted-foreground/70 max-w-xs truncate min-w-0">
                     Fun fact: {medicalFacts[currentFactIndex]}
                   </div>
                 </div>

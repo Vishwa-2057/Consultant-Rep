@@ -117,6 +117,12 @@ const patientSchema = new mongoose.Schema({
     }]
   },
   
+  // Assigned Doctor
+  assignedDoctors: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Doctor'
+  }],
+  
   // Additional Information
   notes: {
     type: String,

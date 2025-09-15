@@ -232,7 +232,7 @@ const InvoiceModal = ({ isOpen, onClose, onSubmit }) => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="amount">Amount ($) *</Label>
+                <Label htmlFor="amount">Amount (₹) *</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -347,7 +347,7 @@ const InvoiceModal = ({ isOpen, onClose, onSubmit }) => {
                   <span className="font-medium">Service:</span> {formData.serviceType}
                 </div>
                 <div>
-                  <span className="font-medium">Amount:</span> ${formData.amount}
+                  <span className="font-medium">Amount:</span> ₹{formData.amount}
                 </div>
                 <div>
                   <span className="font-medium">Due Date:</span> {new Date(formData.dueDate).toLocaleDateString()}

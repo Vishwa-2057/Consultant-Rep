@@ -1,7 +1,18 @@
 import { config } from '../config/env.js';
 
-const API_BASE_URL = config.API_BASE_URL;
+const API_BASE_URL = config.API_BASE_URL || 'http://localhost:5000/api';
 let authToken = null;
+
+// Initialize auth token from localStorage
+const initializeAuth = () => {
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    authToken = token;
+  }
+};
+
+// Call initialization
+initializeAuth();
 
 // Generic API request function
 const apiRequest = async (endpoint, options = {}) => {
@@ -210,6 +221,14 @@ export const consultationAPI = {
   // Get consultation statistics
   getStats: async () => {
     return apiRequest('/consultations/stats');
+  },
+
+  // Update consultation status
+  updateStatus: async (id, status) => {
+    return apiRequest(`/consultations/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
   },
 };
 
@@ -477,6 +496,12 @@ export const complianceAlertAPI = {
       body: JSON.stringify({ status: 'Dismissed' }),
     });
   },
+
+  // Get compliance rate
+  getComplianceRate: async () => {
+    const response = await apiRequest('/compliance-alerts/stats');
+    return response.data.overview.complianceRate;
+  },
 };
 
 // Doctor API functions
@@ -486,15 +511,128 @@ export const doctorAPI = {
     return apiRequest('/doctors');
   },
 
+  // Get doctor by ID
+  getById: async (id) => {
+    return apiRequest(`/doctors/${id}`);
+  },
+
+  // Create new doctor
+  create: async (doctorData) => {
+    return apiRequest('/doctors', {
+      method: 'POST',
+      body: JSON.stringify(doctorData),
+    });
+  },
+
+  // Update doctor
+  update: async (id, doctorData) => {
+    return apiRequest(`/doctors/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(doctorData),
+    });
+  },
+
+  // Delete doctor (soft delete)
+  delete: async (id) => {
+    return apiRequest(`/doctors/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
   // Search doctors by name or specialty
   search: async (query) => {
     return apiRequest(`/doctors/search?q=${encodeURIComponent(query)}`);
   },
 };
 
+// Nurse API functions
+export const nurseAPI = {
+  // Get all nurses
+  getAll: async () => {
+    return apiRequest('/nurses');
+  },
+
+  // Get nurse by ID
+  getById: async (id) => {
+    return apiRequest(`/nurses/${id}`);
+  },
+
+  // Create new nurse
+  create: async (nurseData) => {
+    return apiRequest('/nurses', {
+      method: 'POST',
+      body: JSON.stringify(nurseData),
+    });
+  },
+
+  // Update nurse
+  update: async (id, nurseData) => {
+    return apiRequest(`/nurses/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(nurseData),
+    });
+  },
+
+  // Delete nurse (soft delete)
+  delete: async (id) => {
+    return apiRequest(`/nurses/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Search nurses by name or department
+  search: async (query) => {
+    return apiRequest(`/nurses/search?q=${encodeURIComponent(query)}`);
+  },
+};
+
+// Clinic API functions
+export const clinicAPI = {
+  // Login clinic
+  login: async (payload) => {
+    return apiRequest('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Get clinic profile
+  getProfile: async () => {
+    return apiRequest('/auth/me');
+  },
+
+  // Update clinic profile
+  updateProfile: async (payload) => {
+    return apiRequest('/clinics/profile', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Change password
+  changePassword: async (payload) => {
+    return apiRequest('/clinics/change-password', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Get all clinics
+  getAll: async () => {
+    return apiRequest('/clinics/all');
+  },
+};
+
 // Auth API functions
 export const authAPI = {
-  setToken: (token) => authToken = token,
+  setToken: (token) => {
+    authToken = token;
+    if (token) {
+      localStorage.setItem('authToken', token);
+    } else {
+      localStorage.removeItem('authToken');
+    }
+  },
   clearToken: () => authToken = null,
   register: async (payload) => {
     return apiRequest('/auth/register', {
@@ -594,5 +732,7 @@ export default {
   authAPI,
   complianceAlertAPI,
   emailConfigAPI,
-  doctorAPI
+  doctorAPI,
+  nurseAPI,
+  clinicAPI
 };
