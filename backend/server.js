@@ -10,6 +10,11 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+app.get("/", (req, res) => {
+  res.send("🚀 Backend is working!");
+});
+
+
 // Import routes
 const patientRoutes = require('./routes/patients');
 const appointmentRoutes = require('./routes/appointments');
