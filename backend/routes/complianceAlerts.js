@@ -2,7 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const ComplianceAlert = require('../models/ComplianceAlert');
 const Patient = require('../models/Patient');
-const auth = require('../middleware/auth');
+const { auth, authorize } = require('../middleware/auth');
 const router = express.Router();
 
 // Validation middleware
