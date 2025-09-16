@@ -63,7 +63,7 @@ const apiRequest = async (endpoint, options = {}) => {
 // -----------------
 // Auth API
 // -----------------
-export const authAPI = {
+export const setAuthToken = (token) => = {
   setToken,
   clearToken: () => setAuthToken(null),
   register: (payload) => apiRequest('/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
