@@ -3,7 +3,7 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const mongoose = require('mongoose');
 const Appointment = require('../models/Appointment');
-const auth = require('../middleware/auth');
+const { auth, authorize } = require('../middleware/auth');
 
 // Validation middleware
 const validateAppointment = [
