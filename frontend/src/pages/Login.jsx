@@ -33,8 +33,8 @@ const Login = () => {
         res = await authAPI.login({ email: email.trim(), password });
       }
 
-      // ✅ Use authAPI.setToken correctly
-      authAPI.setToken(res.data.token);
+const token = res.data.token || res.data.accessToken;
+authAPI.setToken(token);
 
       localStorage.setItem(
         "authUser",
