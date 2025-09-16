@@ -24,6 +24,14 @@ import APITest from "./components/APITest.jsx";
 import EmailSettings from "./pages/EmailSettings.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
+const API_BASE = import.meta.env.VITE_API_URL;
+
+useEffect(() => {
+  fetch(${API_BASE}/api/users)
+    .then(res => res.json())
+    .then(data => console.log(data));
+}, []);
+
 const queryClient = new QueryClient();
 
 const App = () => {
