@@ -22,7 +22,7 @@ export const setAuthToken = (token) => {
 // Generic API request
 // -----------------
 const apiRequest = async (endpoint, options = {}) => {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
 
   const defaultOptions = {
     headers: {
@@ -52,9 +52,7 @@ const apiRequest = async (endpoint, options = {}) => {
   } catch (error) {
     console.error('API request failed:', error.message);
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
-      throw new Error(
-        `Network error: Unable to connect to ${url}. Is the backend running?`
-      );
+      throw new Error(`Network error: Unable to connect to ${url}. Is the backend running?`);
     }
     throw error;
   }
@@ -68,8 +66,8 @@ export const authAPI = {
   clearToken: () => setAuthToken(null),
   register: (payload) => apiRequest('/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
   login: (payload) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
-  requestOTP: (email) => apiRequest('/auth/request-otp', { method: 'POST', body: JSON.stringify({ email }) }),
-  loginWithOTP: (email, otp) => apiRequest('/auth/login-otp', { method: 'POST', body: JSON.stringify({ email, otp }) }),
+  requestOTP: ({ email }) => apiRequest('/auth/request-otp', { method: 'POST', body: JSON.stringify({ email }) }),
+  loginWithOTP: ({ email, otp }) => apiRequest('/auth/login-otp', { method: 'POST', body: JSON.stringify({ email, otp }) }),
   me: () => apiRequest('/auth/me'),
 };
 
@@ -77,10 +75,7 @@ export const authAPI = {
 // Patient API
 // -----------------
 export const patientAPI = {
-  getAll: (page = 1, limit = 10, filters = {}) => {
-    const query = new URLSearchParams({ page, limit, ...filters });
-    return apiRequest(`/patients?${query}`);
-  },
+  getAll: (page = 1, limit = 10, filters = {}) => apiRequest(`/patients?${new URLSearchParams({ page, limit, ...filters })}`),
   getById: (id) => apiRequest(`/patients/${id}`),
   create: (data) => apiRequest('/patients', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => apiRequest(`/patients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -93,10 +88,7 @@ export const patientAPI = {
 // Appointment API
 // -----------------
 export const appointmentAPI = {
-  getAll: (page = 1, limit = 10, filters = {}) => {
-    const query = new URLSearchParams({ page, limit, ...filters });
-    return apiRequest(`/appointments?${query}`);
-  },
+  getAll: (page = 1, limit = 10, filters = {}) => apiRequest(`/appointments?${new URLSearchParams({ page, limit, ...filters })}`),
   getById: (id) => apiRequest(`/appointments/${id}`),
   create: (data) => apiRequest('/appointments', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => apiRequest(`/appointments/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -110,10 +102,7 @@ export const appointmentAPI = {
 // Consultation API
 // -----------------
 export const consultationAPI = {
-  getAll: (page = 1, limit = 10, filters = {}) => {
-    const query = new URLSearchParams({ page, limit, ...filters });
-    return apiRequest(`/consultations?${query}`);
-  },
+  getAll: (page = 1, limit = 10, filters = {}) => apiRequest(`/consultations?${new URLSearchParams({ page, limit, ...filters })}`),
   getById: (id) => apiRequest(`/consultations/${id}`),
   create: (data) => apiRequest('/consultations', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => apiRequest(`/consultations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -126,10 +115,7 @@ export const consultationAPI = {
 // Referral API
 // -----------------
 export const referralAPI = {
-  getAll: (page = 1, limit = 10, filters = {}) => {
-    const query = new URLSearchParams({ page, limit, ...filters });
-    return apiRequest(`/referrals?${query}`);
-  },
+  getAll: (page = 1, limit = 10, filters = {}) => apiRequest(`/referrals?${new URLSearchParams({ page, limit, ...filters })}`),
   getById: (id) => apiRequest(`/referrals/${id}`),
   create: (data) => apiRequest('/referrals', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => apiRequest(`/referrals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -145,10 +131,7 @@ export const referralAPI = {
 // Invoice API
 // -----------------
 export const invoiceAPI = {
-  getAll: (page = 1, limit = 10, filters = {}) => {
-    const query = new URLSearchParams({ page, limit, ...filters });
-    return apiRequest(`/invoices?${query}`);
-  },
+  getAll: (page = 1, limit = 10, filters = {}) => apiRequest(`/invoices?${new URLSearchParams({ page, limit, ...filters })}`),
   getById: (id) => apiRequest(`/invoices/${id}`),
   create: (data) => apiRequest('/invoices', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => apiRequest(`/invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -162,10 +145,7 @@ export const invoiceAPI = {
 // Post API
 // -----------------
 export const postAPI = {
-  getAll: (page = 1, limit = 10, filters = {}) => {
-    const query = new URLSearchParams({ page, limit, ...filters });
-    return apiRequest(`/posts?${query}`);
-  },
+  getAll: (page = 1, limit = 10, filters = {}) => apiRequest(`/posts?${new URLSearchParams({ page, limit, ...filters })}`),
   getById: (id) => apiRequest(`/posts/${id}`),
   create: (data) => apiRequest('/posts', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => apiRequest(`/posts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -178,15 +158,11 @@ export const postAPI = {
 // Compliance Alert API
 // -----------------
 export const complianceAlertAPI = {
-  getAll: (page = 1, limit = 10, filters = {}) => {
-    const query = new URLSearchParams({ page, limit, ...filters });
-    return apiRequest(`/compliance-alerts?${query}`);
-  },
+  getAll: (page = 1, limit = 10, filters = {}) => apiRequest(`/compliance-alerts?${new URLSearchParams({ page, limit, ...filters })}`),
   getById: (id) => apiRequest(`/compliance-alerts/${id}`),
   create: (data) => apiRequest('/compliance-alerts', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => apiRequest(`/compliance-alerts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  updateStatus: (id, status, resolutionNotes = '') =>
-    apiRequest(`/compliance-alerts/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, resolutionNotes }) }),
+  updateStatus: (id, status, resolutionNotes = '') => apiRequest(`/compliance-alerts/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, resolutionNotes }) }),
   delete: (id) => apiRequest(`/compliance-alerts/${id}`, { method: 'DELETE' }),
   getStats: () => apiRequest('/compliance-alerts/stats'),
   getByPatient: (patientId) => apiRequest(`/compliance-alerts/patient/${patientId}`),
@@ -250,6 +226,17 @@ export const emailConfigAPI = {
 };
 
 // -----------------
+// Users API
+// -----------------
+export const userAPI = {
+  getAll: () => apiRequest('/users'),
+  getById: (id) => apiRequest(`/users/${id}`),
+  create: (data) => apiRequest('/users', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => apiRequest(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id) => apiRequest(`/users/${id}`, { method: 'DELETE' }),
+};
+
+// -----------------
 // Export all APIs
 // -----------------
 export default {
@@ -265,4 +252,5 @@ export default {
   nurseAPI,
   clinicAPI,
   emailConfigAPI,
+  userAPI,
 };
