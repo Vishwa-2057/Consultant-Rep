@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { authAPI, clinicAPI } from "@/services/api";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Shield, ArrowLeft } from "lucide-react";
 
 const Login = () => {
@@ -21,6 +21,18 @@ const Login = () => {
   const [userType, setUserType] = useState("regular"); // "regular" or "clinic"
   const navigate = useNavigate();
 
+  // Ensure authAPI sets Authorization header with token for all requests
+  // This must be done once (e.g., inside your api service file), example:
+  /*
+  authAPI.interceptors.request.use((config) => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  });
+  */
+
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
     setError("");
@@ -28,18 +40,19 @@ const Login = () => {
     try {
       let res;
       if (userType === "clinic") {
-        res = await clinicAPI.login({ email: email.trim(), password });
+        res = await clinicAPI.post('/login', { email: email.trim(), password }); // ensure correct route and method
       } else {
-        res = await authAPI.login({ email: email.trim(), password });
+        res = await authAPI.post('/login', { email: email.trim(), password });
       }
-      
-      authAPI.setToken(res.token);
-      localStorage.setItem('authToken', res.token);
-      localStorage.setItem('authUser', JSON.stringify(res.user || res.doctor || {}));
+
+      // Save the token & user info on successful login
+      authAPI.setToken?.(res.data.token); // if you have this method, else rely on interceptor
+      localStorage.setItem('authToken', res.data.token);
+      localStorage.setItem('authUser', JSON.stringify(res.data.user || res.data.doctor || {}));
       window.dispatchEvent(new Event('auth-changed'));
       navigate('/');
     } catch (err) {
-      setError(err.message || 'Login failed');
+      setError(err.response?.data?.error || err.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -50,16 +63,16 @@ const Login = () => {
       setError("Please enter your email address first");
       return;
     }
-    
+
     setError("");
     setOtpLoading(true);
     try {
-      const res = await authAPI.requestOTP(email.trim());
+      const res = await authAPI.post('/request-otp', { email: email.trim() }); // confirm route
       setOtpSent(true);
       setOtpTimer(60); // 60 seconds countdown
       startTimer();
     } catch (err) {
-      setError(err.message || 'Failed to send OTP');
+      setError(err.response?.data?.error || err.message || 'Failed to send OTP');
     } finally {
       setOtpLoading(false);
     }
@@ -70,14 +83,14 @@ const Login = () => {
     setError("");
     setLoading(true);
     try {
-      const res = await authAPI.loginWithOTP(email.trim(), otp);
-      authAPI.setToken(res.token);
-      localStorage.setItem('authToken', res.token);
-      localStorage.setItem('authUser', JSON.stringify(res.user || res.doctor || {}));
+      const res = await authAPI.post('/login-with-otp', { email: email.trim(), otp }); // confirm route
+      authAPI.setToken?.(res.data.token);
+      localStorage.setItem('authToken', res.data.token);
+      localStorage.setItem('authUser', JSON.stringify(res.data.user || res.data.doctor || {}));
       window.dispatchEvent(new Event('auth-changed'));
       navigate('/');
     } catch (err) {
-      setError(err.message || 'OTP verification failed');
+      setError(err.response?.data?.error || err.message || 'OTP verification failed');
     } finally {
       setLoading(false);
     }
@@ -113,7 +126,6 @@ const Login = () => {
           <CardDescription className="text-teal-700">Choose your preferred login method</CardDescription>
         </CardHeader>
         <CardContent>
-          {/* User Type Selection */}
           <div className="mb-6">
             <Label className="text-sm font-medium text-teal-900 mb-3 block">Login as:</Label>
             <div className="grid grid-cols-2 gap-2">
@@ -141,7 +153,6 @@ const Login = () => {
               </Button>
             </div>
           </div>
-
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="password" className="flex items-center gap-2">
@@ -153,7 +164,6 @@ const Login = () => {
                 OTP
               </TabsTrigger>
             </TabsList>
-
             <TabsContent value="password" className="space-y-4 mt-6">
               <form onSubmit={handlePasswordLogin} className="space-y-4">
                 <div className="space-y-2">
@@ -191,7 +201,6 @@ const Login = () => {
                 </Button>
               </form>
             </TabsContent>
-
             <TabsContent value="otp" className="space-y-4 mt-6">
               {!otpSent ? (
                 <div className="space-y-4">
@@ -285,10 +294,6 @@ const Login = () => {
               )}
             </TabsContent>
           </Tabs>
-
-          <div className="mt-6 text-center space-y-2">
-            {/* Removed clinic registration - clinic details fetched from database */}
-          </div>
         </CardContent>
       </Card>
     </div>
@@ -296,5 +301,3 @@ const Login = () => {
 };
 
 export default Login;
-
-
