@@ -33,8 +33,9 @@ const Login = () => {
         res = await authAPI.login({ email: email.trim(), password });
       }
 
-      authAPI.setToken?.(res.data.token);
-      localStorage.setItem("authToken", res.data.token);
+      // ✅ Use authAPI.setToken correctly
+      authAPI.setToken(res.data.token);
+
       localStorage.setItem(
         "authUser",
         JSON.stringify(res.data.user || res.data.doctor || {})
@@ -57,7 +58,7 @@ const Login = () => {
     setError("");
     setOtpLoading(true);
     try {
-      const res = await authAPI.requestOTP({ email: email.trim() });
+      await authAPI.requestOTP({ email: email.trim() });
       setOtpSent(true);
       setOtpTimer(60);
       startTimer();
@@ -74,8 +75,7 @@ const Login = () => {
     setLoading(true);
     try {
       const res = await authAPI.loginWithOTP({ email: email.trim(), otp });
-      authAPI.setToken?.(res.data.token);
-      localStorage.setItem("authToken", res.data.token);
+      authAPI.setToken(res.data.token);
       localStorage.setItem(
         "authUser",
         JSON.stringify(res.data.user || res.data.doctor || {})
@@ -121,10 +121,9 @@ const Login = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* User type selection */}
           <div className="mb-6">
-            <Label className="text-sm font-medium text-teal-900 mb-3 block">
-              Login as:
-            </Label>
+            <Label className="text-sm font-medium text-teal-900 mb-3 block">Login as:</Label>
             <div className="grid grid-cols-2 gap-2">
               <Button
                 type="button"
@@ -152,6 +151,8 @@ const Login = () => {
               </Button>
             </div>
           </div>
+
+          {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="password" className="flex items-center gap-2">
@@ -167,6 +168,8 @@ const Login = () => {
                 OTP
               </TabsTrigger>
             </TabsList>
+
+            {/* Password Login */}
             <TabsContent value="password" className="space-y-4 mt-6">
               <form onSubmit={handlePasswordLogin} className="space-y-4">
                 <div className="space-y-2">
@@ -203,12 +206,12 @@ const Login = () => {
                 >
                   {loading
                     ? "Signing in..."
-                    : `Sign In as ${
-                        userType === "clinic" ? "Clinic Admin" : "Regular User"
-                      }`}
+                    : `Sign In as ${userType === "clinic" ? "Clinic Admin" : "Regular User"}`}
                 </Button>
               </form>
             </TabsContent>
+
+            {/* OTP Login */}
             <TabsContent value="otp" className="space-y-4 mt-6">
               {!otpSent ? (
                 <div className="space-y-4">
@@ -238,12 +241,9 @@ const Login = () => {
                     <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mx-auto">
                       <Mail className="w-6 h-6 text-teal-600" />
                     </div>
-                    <h3 className="font-semibold text-teal-900">
-                      Check your email
-                    </h3>
+                    <h3 className="font-semibold text-teal-900">Check your email</h3>
                     <p className="text-sm text-teal-700">
-                      We've sent a 6-digit verification code to{" "}
-                      <strong>{email}</strong>
+                      We've sent a 6-digit verification code to <strong>{email}</strong>
                     </p>
                   </div>
 
