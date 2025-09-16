@@ -1,16 +1,20 @@
+// routes/users.js
 const express = require("express");
-const User = require("../models/User"); // Adjust path
+const User = require("../models/User");
 const { auth, authorize } = require("../middleware/auth");
 
 const router = express.Router();
 
-// Get all users (admin only)
+// ==============================
+// GET ALL USERS (Admin only)
+// ==============================
 router.get("/", auth, authorize("super_master_admin", "super_admin"), async (req, res) => {
   try {
     const { role, clinicId } = req.query;
     const filter = {};
 
     if (role) filter.role = role;
+
     if (req.user.role === "super_admin" && req.user.clinicId) {
       filter.clinicId = req.user.clinicId;
     } else if (clinicId) {
@@ -28,7 +32,9 @@ router.get("/", auth, authorize("super_master_admin", "super_admin"), async (req
   }
 });
 
-// Get user by ID
+// ==============================
+// GET USER BY ID
+// ==============================
 router.get("/:id", auth, async (req, res) => {
   try {
     const user = await User.findById(req.params.id)
@@ -43,7 +49,9 @@ router.get("/:id", auth, async (req, res) => {
   }
 });
 
-// Update user
+// ==============================
+// UPDATE USER
+// ==============================
 router.put("/:id", auth, async (req, res) => {
   try {
     const { firstName, lastName, phone, specialization, licenseNumber, isActive } = req.body;
@@ -60,7 +68,9 @@ router.put("/:id", auth, async (req, res) => {
       req.params.id,
       { firstName, lastName, phone, specialization, licenseNumber, isActive },
       { new: true, runValidators: true }
-    ).populate("clinicId", "name").select("-password -otp -otpExpires");
+    )
+      .populate("clinicId", "name")
+      .select("-password -otp -otpExpires");
 
     res.json({ success: true, message: "User updated successfully", user: updatedUser });
   } catch (error) {
@@ -68,7 +78,9 @@ router.put("/:id", auth, async (req, res) => {
   }
 });
 
-// Delete user
+// ==============================
+// DELETE USER
+// ==============================
 router.delete("/:id", auth, authorize("super_master_admin", "super_admin"), async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
