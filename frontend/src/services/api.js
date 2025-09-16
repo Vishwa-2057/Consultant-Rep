@@ -62,7 +62,6 @@ const apiRequest = async (endpoint, options = {}) => {
       type: error.name
     });
     
-    // Provide more specific error messages
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
       throw new Error(`Network error: Unable to connect to ${url}. Please check if the backend server is running.`);
     }
@@ -71,655 +70,195 @@ const apiRequest = async (endpoint, options = {}) => {
   }
 };
 
+// ---------------------
 // Patient API functions
+// ---------------------
 export const patientAPI = {
-  // Get all patients with optional pagination and filters
   getAll: async (page = 1, limit = 10, filters = {}) => {
-    const queryParams = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      ...filters
-    });
+    const queryParams = new URLSearchParams({ page: page.toString(), limit: limit.toString(), ...filters });
     return apiRequest(`/patients?${queryParams}`);
   },
-
-  // Get patient by ID
-  getById: async (id) => {
-    return apiRequest(`/patients/${id}`);
-  },
-
-  // Create new patient
-  create: async (patientData) => {
-    return apiRequest('/patients', {
-      method: 'POST',
-      body: JSON.stringify(patientData),
-    });
-  },
-
-  // Update patient
-  update: async (id, patientData) => {
-    return apiRequest(`/patients/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(patientData),
-    });
-  },
-
-  // Delete patient
-  delete: async (id) => {
-    return apiRequest(`/patients/${id}`, {
-      method: 'DELETE',
-    });
-  },
-
-  // Get patient statistics
-  getStats: async () => {
-    return apiRequest('/patients/stats');
-  },
-
-  // Quick search patients
-  search: async (query) => {
-    return apiRequest(`/patients/search?q=${encodeURIComponent(query)}`);
-  },
+  getById: async (id) => apiRequest(`/patients/${id}`),
+  create: async (patientData) => apiRequest('/patients', { method: 'POST', body: JSON.stringify(patientData) }),
+  update: async (id, patientData) => apiRequest(`/patients/${id}`, { method: 'PUT', body: JSON.stringify(patientData) }),
+  delete: async (id) => apiRequest(`/patients/${id}`, { method: 'DELETE' }),
+  getStats: async () => apiRequest('/patients/stats'),
+  search: async (query) => apiRequest(`/patients/search?q=${encodeURIComponent(query)}`)
 };
 
+// ------------------------
 // Appointment API functions
+// ------------------------
 export const appointmentAPI = {
-  // Get all appointments with optional pagination and filters
   getAll: async (page = 1, limit = 10, filters = {}) => {
-    const queryParams = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      ...filters
-    });
+    const queryParams = new URLSearchParams({ page: page.toString(), limit: limit.toString(), ...filters });
     return apiRequest(`/appointments?${queryParams}`);
   },
-
-  // Get appointment by ID
-  getById: async (id) => {
-    return apiRequest(`/appointments/${id}`);
-  },
-
-  // Create new appointment
-  create: async (appointmentData) => {
-    return apiRequest('/appointments', {
-      method: 'POST',
-      body: JSON.stringify(appointmentData),
-    });
-  },
-
-  // Update appointment
-  update: async (id, appointmentData) => {
-    return apiRequest(`/appointments/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(appointmentData),
-    });
-  },
-
-  // Delete appointment
-  delete: async (id) => {
-    return apiRequest(`/appointments/${id}`, {
-      method: 'DELETE',
-    });
-  },
-
-  // Get today's appointments
-  getToday: async () => {
-    return apiRequest('/appointments/today');
-  },
-
-  // Get upcoming appointments
-  getUpcoming: async () => {
-    return apiRequest('/appointments/upcoming');
-  },
-
-  // Get appointment statistics
-  getStats: async () => {
-    return apiRequest('/appointments/stats');
-  },
+  getById: async (id) => apiRequest(`/appointments/${id}`),
+  create: async (appointmentData) => apiRequest('/appointments', { method: 'POST', body: JSON.stringify(appointmentData) }),
+  update: async (id, appointmentData) => apiRequest(`/appointments/${id}`, { method: 'PUT', body: JSON.stringify(appointmentData) }),
+  delete: async (id) => apiRequest(`/appointments/${id}`, { method: 'DELETE' }),
+  getToday: async () => apiRequest('/appointments/today'),
+  getUpcoming: async () => apiRequest('/appointments/upcoming'),
+  getStats: async () => apiRequest('/appointments/stats')
 };
 
+// ------------------------
 // Consultation API functions
+// ------------------------
 export const consultationAPI = {
-  // Get all consultations
   getAll: async (page = 1, limit = 10, filters = {}) => {
-    const queryParams = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      ...filters
-    });
+    const queryParams = new URLSearchParams({ page: page.toString(), limit: limit.toString(), ...filters });
     return apiRequest(`/consultations?${queryParams}`);
   },
-
-  // Get consultation by ID
-  getById: async (id) => {
-    return apiRequest(`/consultations/${id}`);
-  },
-
-  // Create new consultation
-  create: async (consultationData) => {
-    return apiRequest('/consultations', {
-      method: 'POST',
-      body: JSON.stringify(consultationData),
-    });
-  },
-
-  // Update consultation
-  update: async (id, consultationData) => {
-    return apiRequest(`/consultations/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(consultationData),
-    });
-  },
-
-  // Delete consultation
-  delete: async (id) => {
-    return apiRequest(`/consultations/${id}`, {
-      method: 'DELETE',
-    });
-  },
-
-  // Get consultation statistics
-  getStats: async () => {
-    return apiRequest('/consultations/stats');
-  },
-
-  // Update consultation status
-  updateStatus: async (id, status) => {
-    return apiRequest(`/consultations/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    });
-  },
+  getById: async (id) => apiRequest(`/consultations/${id}`),
+  create: async (consultationData) => apiRequest('/consultations', { method: 'POST', body: JSON.stringify(consultationData) }),
+  update: async (id, consultationData) => apiRequest(`/consultations/${id}`, { method: 'PUT', body: JSON.stringify(consultationData) }),
+  delete: async (id) => apiRequest(`/consultations/${id}`, { method: 'DELETE' }),
+  getStats: async () => apiRequest('/consultations/stats'),
+  updateStatus: async (id, status) => apiRequest(`/consultations/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) })
 };
 
+// -------------------
 // Referral API functions
+// -------------------
 export const referralAPI = {
-  // Get all referrals
   getAll: async (page = 1, limit = 10, filters = {}) => {
-    const queryParams = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      ...filters
-    });
+    const queryParams = new URLSearchParams({ page: page.toString(), limit: limit.toString(), ...filters });
     return apiRequest(`/referrals?${queryParams}`);
   },
-
-  // Get referral by ID
-  getById: async (id) => {
-    return apiRequest(`/referrals/${id}`);
-  },
-
-  // Create new referral
-  create: async (referralData) => {
-    return apiRequest('/referrals', {
-      method: 'POST',
-      body: JSON.stringify(referralData),
-    });
-  },
-
-  // Update referral
-  update: async (id, referralData) => {
-    return apiRequest(`/referrals/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(referralData),
-    });
-  },
-
-  // Delete referral
-  delete: async (id) => {
-    return apiRequest(`/referrals/${id}`, {
-      method: 'DELETE',
-    });
-  },
-
-  // Update referral status
-  updateStatus: async (id, status) => {
-    return apiRequest(`/referrals/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    });
-  },
-
-  // Get referral statistics
-  getStats: async () => {
-    return apiRequest('/referrals/stats/summary');
-  },
-
-  // Generate shareable referral link
-  generateLink: async (id) => {
-    return apiRequest(`/referrals/${id}/generate-link`, {
-      method: 'POST',
-    });
-  },
-
-  // Get referral by shareable code
-  getByCode: async (code) => {
-    return apiRequest(`/referrals/shared/${code}`);
-  },
-
-  // Deactivate shareable link
-  deactivateLink: async (id) => {
-    return apiRequest(`/referrals/${id}/deactivate-link`, {
-      method: 'PATCH',
-    });
-  },
+  getById: async (id) => apiRequest(`/referrals/${id}`),
+  create: async (referralData) => apiRequest('/referrals', { method: 'POST', body: JSON.stringify(referralData) }),
+  update: async (id, referralData) => apiRequest(`/referrals/${id}`, { method: 'PUT', body: JSON.stringify(referralData) }),
+  delete: async (id) => apiRequest(`/referrals/${id}`, { method: 'DELETE' }),
+  updateStatus: async (id, status) => apiRequest(`/referrals/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  getStats: async () => apiRequest('/referrals/stats/summary'),
+  generateLink: async (id) => apiRequest(`/referrals/${id}/generate-link`, { method: 'POST' }),
+  getByCode: async (code) => apiRequest(`/referrals/shared/${code}`),
+  deactivateLink: async (id) => apiRequest(`/referrals/${id}/deactivate-link`, { method: 'PATCH' })
 };
 
+// -----------------
 // Invoice API functions
+// -----------------
 export const invoiceAPI = {
-  // Get all invoices
   getAll: async (page = 1, limit = 10, filters = {}) => {
-    const queryParams = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      ...filters
-    });
+    const queryParams = new URLSearchParams({ page: page.toString(), limit: limit.toString(), ...filters });
     return apiRequest(`/invoices?${queryParams}`);
   },
-
-  // Get invoice by ID
-  getById: async (id) => {
-    return apiRequest(`/invoices/${id}`);
-  },
-
-  // Create new invoice
-  create: async (invoiceData) => {
-    return apiRequest('/invoices', {
-      method: 'POST',
-      body: JSON.stringify(invoiceData),
-    });
-  },
-
-  // Update invoice
-  update: async (id, invoiceData) => {
-    return apiRequest(`/invoices/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(invoiceData),
-    });
-  },
-
-  // Update invoice status (uses backend PATCH /invoices/:id/status)
-  updateStatus: async (id, status) => {
-    return apiRequest(`/invoices/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    });
-  },
-
-  // Delete invoice
-  delete: async (id) => {
-    return apiRequest(`/invoices/${id}`, {
-      method: 'DELETE',
-    });
-  },
-
-  // Get invoice statistics
-  getStats: async () => {
-    return apiRequest('/invoices/stats');
-  },
-
-  // Get current month revenue
-  getCurrentMonthRevenue: async () => {
-    return apiRequest('/invoices/stats/current-month-revenue');
-  },
+  getById: async (id) => apiRequest(`/invoices/${id}`),
+  create: async (invoiceData) => apiRequest('/invoices', { method: 'POST', body: JSON.stringify(invoiceData) }),
+  update: async (id, invoiceData) => apiRequest(`/invoices/${id}`, { method: 'PUT', body: JSON.stringify(invoiceData) }),
+  updateStatus: async (id, status) => apiRequest(`/invoices/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  delete: async (id) => apiRequest(`/invoices/${id}`, { method: 'DELETE' }),
+  getStats: async () => apiRequest('/invoices/stats'),
+  getCurrentMonthRevenue: async () => apiRequest('/invoices/stats/current-month-revenue')
 };
 
+// -----------------
 // Post API functions
+// -----------------
 export const postAPI = {
-  // Get all posts
   getAll: async (page = 1, limit = 10, filters = {}) => {
-    const queryParams = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      ...filters
-    });
+    const queryParams = new URLSearchParams({ page: page.toString(), limit: limit.toString(), ...filters });
     return apiRequest(`/posts?${queryParams}`);
   },
-
-  // Get post by ID
-  getById: async (id) => {
-    return apiRequest(`/posts/${id}`);
-  },
-
-  // Create new post
-  create: async (postData) => {
-    return apiRequest('/posts', {
-      method: 'POST',
-      body: JSON.stringify(postData),
-    });
-  },
-
-  // Update post
-  update: async (id, postData) => {
-    return apiRequest(`/posts/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(postData),
-    });
-  },
-
-  // Delete post
-  delete: async (id) => {
-    return apiRequest(`/posts/${id}`, {
-      method: 'DELETE',
-    });
-  },
-
-  // Get post statistics
-  getStats: async () => {
-    return apiRequest('/posts/stats');
-  },
-
-  // Search posts by tags
-  searchByTags: async (tags) => {
-    return apiRequest(`/posts/search?tags=${encodeURIComponent(tags.join(','))}`);
-  },
+  getById: async (id) => apiRequest(`/posts/${id}`),
+  create: async (postData) => apiRequest('/posts', { method: 'POST', body: JSON.stringify(postData) }),
+  update: async (id, postData) => apiRequest(`/posts/${id}`, { method: 'PUT', body: JSON.stringify(postData) }),
+  delete: async (id) => apiRequest(`/posts/${id}`, { method: 'DELETE' }),
+  getStats: async () => apiRequest('/posts/stats'),
+  searchByTags: async (tags) => apiRequest(`/posts/search?tags=${encodeURIComponent(tags.join(','))}`)
 };
 
+// ---------------------------
 // Compliance Alert API functions
+// ---------------------------
 export const complianceAlertAPI = {
-  // Get all compliance alerts with optional pagination and filters
   getAll: async (page = 1, limit = 10, filters = {}) => {
-    const queryParams = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      ...filters
-    });
+    const queryParams = new URLSearchParams({ page: page.toString(), limit: limit.toString(), ...filters });
     return apiRequest(`/compliance-alerts?${queryParams}`);
   },
-
-  // Get compliance alert by ID
-  getById: async (id) => {
-    return apiRequest(`/compliance-alerts/${id}`);
-  },
-
-  // Create new compliance alert
-  create: async (alertData) => {
-    return apiRequest('/compliance-alerts', {
-      method: 'POST',
-      body: JSON.stringify(alertData),
-    });
-  },
-
-  // Update compliance alert
-  update: async (id, alertData) => {
-    return apiRequest(`/compliance-alerts/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(alertData),
-    });
-  },
-
-  // Update compliance alert status
-  updateStatus: async (id, status, resolutionNotes = '') => {
-    return apiRequest(`/compliance-alerts/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status, resolutionNotes }),
-    });
-  },
-
-  // Delete compliance alert
-  delete: async (id) => {
-    return apiRequest(`/compliance-alerts/${id}`, {
-      method: 'DELETE',
-    });
-  },
-
-  // Get compliance alert statistics
-  getStats: async () => {
-    return apiRequest('/compliance-alerts/stats');
-  },
-
-  // Get alerts for specific patient
-  getByPatient: async (patientId) => {
-    return apiRequest(`/compliance-alerts/patient/${patientId}`);
-  },
-
-  // Acknowledge alert
-  acknowledge: async (id) => {
-    return apiRequest(`/compliance-alerts/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'Acknowledged' }),
-    });
-  },
-
-  // Resolve alert
-  resolve: async (id, resolutionNotes = '') => {
-    return apiRequest(`/compliance-alerts/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'Resolved', resolutionNotes }),
-    });
-  },
-
-  // Dismiss alert
-  dismiss: async (id) => {
-    return apiRequest(`/compliance-alerts/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'Dismissed' }),
-    });
-  },
-
-  // Get compliance rate
+  getById: async (id) => apiRequest(`/compliance-alerts/${id}`),
+  create: async (alertData) => apiRequest('/compliance-alerts', { method: 'POST', body: JSON.stringify(alertData) }),
+  update: async (id, alertData) => apiRequest(`/compliance-alerts/${id}`, { method: 'PUT', body: JSON.stringify(alertData) }),
+  updateStatus: async (id, status, resolutionNotes = '') => apiRequest(`/compliance-alerts/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, resolutionNotes }) }),
+  delete: async (id) => apiRequest(`/compliance-alerts/${id}`, { method: 'DELETE' }),
+  getStats: async () => apiRequest('/compliance-alerts/stats'),
+  getByPatient: async (patientId) => apiRequest(`/compliance-alerts/patient/${patientId}`),
+  acknowledge: async (id) => apiRequest(`/compliance-alerts/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'Acknowledged' }) }),
+  resolve: async (id, resolutionNotes = '') => apiRequest(`/compliance-alerts/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'Resolved', resolutionNotes }) }),
+  dismiss: async (id) => apiRequest(`/compliance-alerts/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'Dismissed' }) }),
   getComplianceRate: async () => {
     const response = await apiRequest('/compliance-alerts/stats');
     return response.data.overview.complianceRate;
-  },
+  }
 };
 
+// -----------------
 // Doctor API functions
+// -----------------
 export const doctorAPI = {
-  // Get all doctors
-  getAll: async () => {
-    return apiRequest('/doctors');
-  },
-
-  // Get doctor by ID
-  getById: async (id) => {
-    return apiRequest(`/doctors/${id}`);
-  },
-
-  // Create new doctor
-  create: async (doctorData) => {
-    return apiRequest('/doctors', {
-      method: 'POST',
-      body: JSON.stringify(doctorData),
-    });
-  },
-
-  // Update doctor
-  update: async (id, doctorData) => {
-    return apiRequest(`/doctors/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(doctorData),
-    });
-  },
-
-  // Delete doctor (soft delete)
-  delete: async (id) => {
-    return apiRequest(`/doctors/${id}`, {
-      method: 'DELETE',
-    });
-  },
-
-  // Search doctors by name or specialty
-  search: async (query) => {
-    return apiRequest(`/doctors/search?q=${encodeURIComponent(query)}`);
-  },
+  getAll: async () => apiRequest('/doctors'),
+  getById: async (id) => apiRequest(`/doctors/${id}`),
+  create: async (doctorData) => apiRequest('/doctors', { method: 'POST', body: JSON.stringify(doctorData) }),
+  update: async (id, doctorData) => apiRequest(`/doctors/${id}`, { method: 'PUT', body: JSON.stringify(doctorData) }),
+  delete: async (id) => apiRequest(`/doctors/${id}`, { method: 'DELETE' }),
+  search: async (query) => apiRequest(`/doctors/search?q=${encodeURIComponent(query)}`)
 };
 
+// -----------------
 // Nurse API functions
+// -----------------
 export const nurseAPI = {
-  // Get all nurses
-  getAll: async () => {
-    return apiRequest('/nurses');
-  },
-
-  // Get nurse by ID
-  getById: async (id) => {
-    return apiRequest(`/nurses/${id}`);
-  },
-
-  // Create new nurse
-  create: async (nurseData) => {
-    return apiRequest('/nurses', {
-      method: 'POST',
-      body: JSON.stringify(nurseData),
-    });
-  },
-
-  // Update nurse
-  update: async (id, nurseData) => {
-    return apiRequest(`/nurses/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(nurseData),
-    });
-  },
-
-  // Delete nurse (soft delete)
-  delete: async (id) => {
-    return apiRequest(`/nurses/${id}`, {
-      method: 'DELETE',
-    });
-  },
-
-  // Search nurses by name or department
-  search: async (query) => {
-    return apiRequest(`/nurses/search?q=${encodeURIComponent(query)}`);
-  },
+  getAll: async () => apiRequest('/nurses'),
+  getById: async (id) => apiRequest(`/nurses/${id}`),
+  create: async (nurseData) => apiRequest('/nurses', { method: 'POST', body: JSON.stringify(nurseData) }),
+  update: async (id, nurseData) => apiRequest(`/nurses/${id}`, { method: 'PUT', body: JSON.stringify(nurseData) }),
+  delete: async (id) => apiRequest(`/nurses/${id}`, { method: 'DELETE' }),
+  search: async (query) => apiRequest(`/nurses/search?q=${encodeURIComponent(query)}`)
 };
 
+// -----------------
 // Clinic API functions
+// -----------------
 export const clinicAPI = {
-  // Login clinic
-  login: async (payload) => {
-    return apiRequest('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  },
-
-  // Get clinic profile
-  getProfile: async () => {
-    return apiRequest('/auth/me');
-  },
-
-  // Update clinic profile
-  updateProfile: async (payload) => {
-    return apiRequest('/clinics/profile', {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    });
-  },
-
-  // Change password
-  changePassword: async (payload) => {
-    return apiRequest('/clinics/change-password', {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    });
-  },
-
-  // Get all clinics
-  getAll: async () => {
-    return apiRequest('/clinics/all');
-  },
+  login: async (payload) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
+  getProfile: async () => apiRequest('/auth/me'),
+  updateProfile: async (payload) => apiRequest('/clinics/profile', { method: 'PUT', body: JSON.stringify(payload) }),
+  changePassword: async (payload) => apiRequest('/clinics/change-password', { method: 'PUT', body: JSON.stringify(payload) }),
+  getAll: async () => apiRequest('/clinics/all')
 };
 
+// -----------------
 // Auth API functions
+// -----------------
 export const authAPI = {
   setToken: (token) => {
     authToken = token;
-    if (token) {
-      localStorage.setItem('authToken', token);
-    } else {
-      localStorage.removeItem('authToken');
-    }
+    if (token) localStorage.setItem('authToken', token);
+    else localStorage.removeItem('authToken');
   },
   clearToken: () => authToken = null,
-  register: async (payload) => {
-    return apiRequest('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  },
-  login: async (payload) => {
-    return apiRequest('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  },
-  // OTP-based authentication
-  requestOTP: async (email) => {
-    return apiRequest('/auth/request-otp', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
-    });
-  },
-  loginWithOTP: async (email, otp) => {
-    return apiRequest('/auth/login-otp', {
-      method: 'POST',
-      body: JSON.stringify({ email, otp }),
-    });
-  },
-  me: async () => {
-    return apiRequest('/auth/me');
-  }
+  register: async (payload) => apiRequest('/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
+  login: async (payload) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
+  requestOTP: async (email) => apiRequest('/auth/request-otp', { method: 'POST', body: JSON.stringify({ email }) }),
+  loginWithOTP: async (email, otp) => apiRequest('/auth/login-otp', { method: 'POST', body: JSON.stringify({ email, otp }) }),
+  me: async () => apiRequest('/auth/me')
 };
 
+// ---------------------
 // Email Config API functions
+// ---------------------
 export const emailConfigAPI = {
-  // Get all email configurations for a doctor
-  getAll: async (doctorId) => {
-    return apiRequest(`/email-config?doctorId=${doctorId}`);
-  },
-  
-  // Get active email configuration
-  getActive: async (doctorId) => {
-    return apiRequest(`/email-config/active/${doctorId}`);
-  },
-  
-  // Create new email configuration
-  create: async (config) => {
-    return apiRequest('/email-config', {
-      method: 'POST',
-      body: JSON.stringify(config),
-    });
-  },
-  
-  // Update email configuration
-  update: async (id, config) => {
-    return apiRequest(`/email-config/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(config),
-    });
-  },
-  
-  // Delete email configuration
-  delete: async (id) => {
-    return apiRequest(`/email-config/${id}`, {
-      method: 'DELETE',
-    });
-  },
-  
-  // Test email configuration
-  test: async (id) => {
-    return apiRequest(`/email-config/${id}/test`, {
-      method: 'POST',
-    });
-  },
-  
-  // Set as default configuration
-  setDefault: async (id) => {
-    return apiRequest(`/email-config/${id}/set-default`, {
-      method: 'POST',
-    });
-  },
-  
-  // Create default configuration for new doctor
-  createDefault: async (doctorId, email, password, displayName) => {
-    return apiRequest('/email-config/create-default', {
-      method: 'POST',
-      body: JSON.stringify({ doctorId, email, password, displayName }),
-    });
-  }
+  getAll: async (doctorId) => apiRequest(`/email-config?doctorId=${doctorId}`),
+  getActive: async (doctorId) => apiRequest(`/email-config/active/${doctorId}`),
+  create: async (config) => apiRequest('/email-config', { method: 'POST', body: JSON.stringify(config) }),
+  update: async (id, config) => apiRequest(`/email-config/${id}`, { method: 'PUT', body: JSON.stringify(config) }),
+  delete: async (id) => apiRequest(`/email-config/${id}`, { method: 'DELETE' }),
+  test: async (id) => apiRequest(`/email-config/${id}/test`, { method: 'POST' }),
+  setDefault: async (id) => apiRequest(`/email-config/${id}/set-default`, { method: 'POST' }),
+  createDefault: async (doctorId, email, password, displayName) => apiRequest('/email-config/create-default', { method: 'POST', body: JSON.stringify({ doctorId, email, password, displayName }) })
 };
 
 export default {
