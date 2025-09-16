@@ -10,6 +10,9 @@ require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// ✅ Tell Express it’s behind a proxy (important for Render & express-rate-limit)
+app.set("trust proxy", 1);
+
 // Test route
 app.get("/", (req, res) => {
   res.send("🚀 Backend is working!");
@@ -64,7 +67,7 @@ app.use(
   })
 );
 
-// Rate limiting
+// ✅ Rate limiting
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
@@ -142,7 +145,7 @@ const startServer = async () => {
   try {
     await connectDB();
 
-    app.listen(PORT, () => {
+    app.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(
         `📱 Frontend URL: ${process.env.FRONTEND_URL || "http://localhost:5173"}`
