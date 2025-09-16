@@ -16,6 +16,7 @@ app.get("/", (req, res) => {
 });
 
 // Import routes
+const usersRoutes = require("./routes/users"); // ✅ Added users route
 const patientRoutes = require("./routes/patients");
 const appointmentRoutes = require("./routes/appointments");
 const consultationRoutes = require("./routes/consultations");
@@ -81,7 +82,8 @@ app.get("/health", (req, res) => {
   });
 });
 
-// API routes
+// ✅ API routes
+app.use("/api/users", usersRoutes); // ✅ Mount users route
 app.use("/api/patients", patientRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/consultations", consultationRoutes);
