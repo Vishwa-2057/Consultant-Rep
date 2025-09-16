@@ -34,38 +34,21 @@ const superAdminRoutes = require("./routes/superadmin");
 app.use(helmet());
 app.use(compression());
 app.use(morgan("combined"));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// ✅ CORS configuration (single, clean setup)
+// ✅ CORS configuration
 const allowedOrigins = [
-  process.env.FRONTEND_URL || "http://localhost:8000",
-  "http://localhost:5173",
-  "http://localhost:8080",
-  "http://localhost:8081",
-  "http://127.0.0.1:8000",
-  "http://127.0.0.1:8080",
-  "http://127.0.0.1:8081",
-  "http://127.0.0.1:5173",
-  "https://ornate-kringle-eda7fb.netlify.app", // ✅ Netlify frontend
+  process.env.FRONTEND_URL || "http://localhost:5173",
+  "https://ornate-kringle-eda7fb.netlify.app",
 ];
 
 app.use(
   cors({
     origin: function (origin, callback) {
+      // allow requests with no origin (mobile apps, curl)
       if (!origin) return callback(null, true);
-
-      // Allow localhost & LAN
-      if (
-        origin.includes("localhost") ||
-        origin.includes("127.0.0.1") ||
-        origin.includes("192.168.")
-      ) {
-        return callback(null, true);
-      }
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
+      if (allowedOrigins.includes(origin)) return callback(null, true);
       console.log("❌ CORS blocked origin:", origin);
       return callback(new Error("Not allowed by CORS"));
     },
@@ -78,22 +61,16 @@ app.use(
       "Accept",
       "Origin",
     ],
-    exposedHeaders: ["Content-Length", "X-Foo", "X-Bar"],
-    optionsSuccessStatus: 200,
   })
 );
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 min
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
   message: "Too many requests from this IP, please try again later.",
 });
 app.use("/api/", limiter);
-
-// Body parsing
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Health check
 app.get("/health", (req, res) => {
@@ -167,7 +144,7 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(
-        `📱 Frontend URL: ${process.env.FRONTEND_URL || "http://localhost:8080"}`
+        `📱 Frontend URL: ${process.env.FRONTEND_URL || "http://localhost:5173"}`
       );
       console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
     });
