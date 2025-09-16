@@ -152,6 +152,29 @@ export const referralAPI = {
   deactivateLink: (id) => apiRequest(`/referrals/${id}/deactivate-link`, { method: 'PATCH' }),
 };
 
+export const complianceAlertAPI = {
+  getAll: (page = 1, limit = 10, filters = {}) => {
+    const query = new URLSearchParams({ page, limit, ...filters });
+    return apiRequest(`/compliance-alerts?${query}`);
+  },
+  getById: (id) => apiRequest(`/compliance-alerts/${id}`),
+  create: (data) => apiRequest('/compliance-alerts', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => apiRequest(`/compliance-alerts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  updateStatus: (id, status, resolutionNotes = '') =>
+    apiRequest(`/compliance-alerts/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, resolutionNotes }) }),
+  delete: (id) => apiRequest(`/compliance-alerts/${id}`, { method: 'DELETE' }),
+  getStats: () => apiRequest('/compliance-alerts/stats'),
+  getByPatient: (patientId) => apiRequest(`/compliance-alerts/patient/${patientId}`),
+  acknowledge: (id) => apiRequest(`/compliance-alerts/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'Acknowledged' }) }),
+  resolve: (id, resolutionNotes = '') => apiRequest(`/compliance-alerts/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'Resolved', resolutionNotes }) }),
+  dismiss: (id) => apiRequest(`/compliance-alerts/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'Dismissed' }) }),
+  getComplianceRate: async () => {
+    const res = await apiRequest('/compliance-alerts/stats');
+    return res.data?.overview?.complianceRate || 0;
+  },
+};
+
+
 // -----------------
 // Invoice API
 // -----------------
@@ -229,6 +252,7 @@ export default {
   consultationAPI,
   referralAPI,
   invoiceAPI,
+  complianceAlertAPI,
   doctorAPI,
   nurseAPI,
   clinicAPI,
