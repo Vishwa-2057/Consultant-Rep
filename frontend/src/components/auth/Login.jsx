@@ -1,41 +1,49 @@
-import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
-import { toast } from 'react-hot-toast'
-import { Heart, Mail, Lock } from 'lucide-react'
-import { authAPI } from '../../services/api'
-import { useAuth } from '../../contexts/AuthContext'
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { toast } from 'react-hot-toast';
+import { Heart, Mail, Lock } from 'lucide-react';
+import { authAPI } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Login = () => {
-  const [loading, setLoading] = useState(false)
-  const { login } = useAuth()
-  const navigate = useNavigate()
-  
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
   const {
     register,
     handleSubmit,
-    formState: { errors }
-  } = useForm()
+    formState: { errors },
+  } = useForm();
 
   const onSubmit = async (data) => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const response = await authAPI.login(data)
-      if (response.data.success) {
-        login(response.data.user, response.data.token)
-        toast.success('Login successful!')
-        navigate('/')
+      // Call API
+      const response = await authAPI.login(data);
+
+      if (response?.data?.success) {
+        // Save token and user in context
+        login(response.data.user, response.data.token);
+        authAPI.setToken(response.data.token);
+
+        toast.success('Login successful!');
+        navigate('/'); // Redirect to dashboard
+      } else {
+        toast.error(response?.data?.message || 'Login failed');
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Login failed')
+      console.error('Login error:', error);
+      toast.error(error.response?.data?.message || error.message || 'Login failed');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gray-50">
+      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-md">
         <div className="text-center">
           <div className="flex justify-center">
             <Heart className="h-12 w-12 text-primary-500" />
@@ -47,9 +55,10 @@ const Login = () => {
             Access your EMR healthcare dashboard
           </p>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-4">
+            {/* Email Field */}
             <div>
               <label className="form-label">
                 <Mail className="inline w-4 h-4 mr-2" />
@@ -60,11 +69,11 @@ const Login = () => {
                   required: 'Email is required',
                   pattern: {
                     value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                    message: 'Invalid email address'
-                  }
+                    message: 'Invalid email address',
+                  },
                 })}
                 type="email"
-                className="form-input"
+                className="form-input w-full mt-1"
                 placeholder="Enter your email"
               />
               {errors.email && (
@@ -72,6 +81,7 @@ const Login = () => {
               )}
             </div>
 
+            {/* Password Field */}
             <div>
               <label className="form-label">
                 <Lock className="inline w-4 h-4 mr-2" />
@@ -82,11 +92,11 @@ const Login = () => {
                   required: 'Password is required',
                   minLength: {
                     value: 6,
-                    message: 'Password must be at least 6 characters'
-                  }
+                    message: 'Password must be at least 6 characters',
+                  },
                 })}
                 type="password"
-                className="form-input"
+                className="form-input w-full mt-1"
                 placeholder="Enter your password"
               />
               {errors.password && (
@@ -95,11 +105,12 @@ const Login = () => {
             </div>
           </div>
 
+          {/* Submit Button */}
           <div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full btn-primary flex justify-center items-center"
+              className="w-full btn-primary flex justify-center items-center py-2 px-4 rounded-md text-white font-medium hover:bg-primary-600 transition"
             >
               {loading ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
@@ -109,6 +120,7 @@ const Login = () => {
             </button>
           </div>
 
+          {/* Register Link */}
           <div className="text-center">
             <p className="text-sm text-gray-600">
               Don't have an account?{' '}
@@ -123,7 +135,7 @@ const Login = () => {
         </form>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Login
+export default Login;
