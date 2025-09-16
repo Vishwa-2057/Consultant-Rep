@@ -7,14 +7,9 @@ const router = express.Router();
 
 // --------------------- Validation Middleware ---------------------
 const validatePatient = [
-  body('fullName')
-    .trim()
-    .isLength({ min: 1, max: 100 })
-    .withMessage('Full name is required and must be less than 100 characters'),
+  body('fullName').trim().isLength({ min: 1, max: 100 }).withMessage('Full name is required and must be less than 100 characters'),
   body('dateOfBirth').isISO8601().withMessage('Valid date of birth is required'),
-  body('gender')
-    .isIn(['Male', 'Female', 'Other', 'Prefer not to say'])
-    .withMessage('Valid gender selection is required'),
+  body('gender').isIn(['Male', 'Female', 'Other', 'Prefer not to say']).withMessage('Valid gender selection is required'),
   body('phone').trim().isLength({ min: 1 }).withMessage('Phone number is required'),
   body('email').optional().isEmail().withMessage('Valid email address is required'),
   body('address.street').trim().isLength({ min: 1 }).withMessage('Street address is required'),
@@ -25,7 +20,9 @@ const validatePatient = [
 
 // --------------------- Patient Routes ---------------------
 
-// GET /api/patients/stats/summary - Patient statistics
+// Static routes first
+
+// GET /api/patients/stats/summary
 router.get('/stats/summary', auth, async (req, res) => {
   try {
     const baseQuery = req.user.role === 'doctor' ? { assignedDoctors: req.user.id } : {};
@@ -34,9 +31,7 @@ router.get('/stats/summary', auth, async (req, res) => {
     const followUpPatients = await Patient.countDocuments({ ...baseQuery, status: 'Follow-up' });
     const completedPatients = await Patient.countDocuments({ ...baseQuery, status: 'Completed' });
 
-    const matchStage = req.user.role === 'doctor' 
-      ? { $match: { assignedDoctors: req.user.id } }
-      : { $match: {} };
+    const matchStage = req.user.role === 'doctor' ? { $match: { assignedDoctors: req.user.id } } : { $match: {} };
 
     const ageGroups = await Patient.aggregate([
       matchStage,
@@ -61,7 +56,7 @@ router.get('/stats/summary', auth, async (req, res) => {
   }
 });
 
-// GET /api/patients/search/quick - Quick search patients
+// GET /api/patients/search/quick
 router.get('/search/quick', auth, async (req, res) => {
   try {
     const { q } = req.query;
@@ -87,7 +82,9 @@ router.get('/search/quick', auth, async (req, res) => {
   }
 });
 
-// GET /api/patients - List all patients
+// CRUD and dynamic routes
+
+// GET /api/patients
 router.get('/', auth, async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '', status = '', sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
@@ -133,7 +130,7 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// GET /api/patients/:id - Get patient by ID
+// GET /api/patients/:id
 router.get('/:id', auth, async (req, res) => {
   try {
     const query = { _id: req.params.id };
@@ -151,7 +148,7 @@ router.get('/:id', auth, async (req, res) => {
   }
 });
 
-// POST /api/patients - Create patient
+// POST /api/patients
 router.post('/', auth, validatePatient, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -166,14 +163,12 @@ router.post('/', auth, validatePatient, async (req, res) => {
     res.status(201).json({ message: 'Patient created successfully', patient: patient.toJSON() });
   } catch (error) {
     console.error('Error creating patient:', error);
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({ error: 'Validation failed', details: Object.values(error.errors).map(e => e.message) });
-    }
+    if (error.name === 'ValidationError') return res.status(400).json({ error: 'Validation failed', details: Object.values(error.errors).map(e => e.message) });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// PUT /api/patients/:id - Update patient
+// PUT /api/patients/:id
 router.put('/:id', auth, validatePatient, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -201,7 +196,7 @@ router.put('/:id', auth, validatePatient, async (req, res) => {
   }
 });
 
-// DELETE /api/patients/:id - Delete patient
+// DELETE /api/patients/:id
 router.delete('/:id', auth, async (req, res) => {
   try {
     const patient = await Patient.findById(req.params.id);
@@ -216,7 +211,7 @@ router.delete('/:id', auth, async (req, res) => {
   }
 });
 
-// PATCH /api/patients/:id/status - Update status
+// PATCH /api/patients/:id/status
 router.patch('/:id/status', auth, async (req, res) => {
   try {
     const { status } = req.body;
