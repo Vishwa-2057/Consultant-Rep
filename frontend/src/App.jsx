@@ -27,24 +27,24 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 const queryClient = new QueryClient();
 
 const App = () => {
-  const [token, setToken] = useState(localStorage.getItem('authToken'));
+  const [token, setToken] = useState(localStorage.getItem("authToken"));
   const isAuthed = Boolean(token);
 
   useEffect(() => {
-
     const API_BASE = import.meta.env.VITE_API_URL;
 
-  useEffect(() => {
-    fetch($(API_BASE)/api/users)
-      .then(res => res.json())
-      .then(data => console.log(data));
-  }, []);
+    // ✅ Call API here (not in another useEffect)
+    fetch(`${API_BASE}/api/users`)
+      .then((res) => res.json())
+      .then((data) => console.log("Users:", data))
+      .catch((err) => console.error("API error:", err));
 
-    const stored = localStorage.getItem('authToken');
+    const stored = localStorage.getItem("authToken");
     if (stored) authAPI.setToken(stored);
-    // Listen for auth changes triggered by login/logout
+
+    // ✅ Listen for auth changes
     const handleAuthChanged = () => {
-      const latest = localStorage.getItem('authToken');
+      const latest = localStorage.getItem("authToken");
       setToken(latest);
       if (latest) {
         authAPI.setToken(latest);
@@ -52,8 +52,9 @@ const App = () => {
         authAPI.clearToken();
       }
     };
-    window.addEventListener('auth-changed', handleAuthChanged);
-    return () => window.removeEventListener('auth-changed', handleAuthChanged);
+
+    window.addEventListener("auth-changed", handleAuthChanged);
+    return () => window.removeEventListener("auth-changed", handleAuthChanged);
   }, []);
 
   return (
@@ -67,21 +68,141 @@ const App = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/superadmin/register" element={<SuperAdminRegister />} />
-              <Route path="/" element={isAuthed ? <ProtectedRoute routeName="dashboard"><Dashboard /></ProtectedRoute> : <Navigate to="/login" replace />} />
-              <Route path="/patients" element={isAuthed ? <ProtectedRoute routeName="patient-management"><PatientManagement /></ProtectedRoute> : <Navigate to="/login" replace />} />
-              <Route path="/doctors" element={isAuthed ? <ProtectedRoute routeName="doctors-management"><DoctorsManagement /></ProtectedRoute> : <Navigate to="/login" replace />} />
-              <Route path="/nurses" element={isAuthed ? <ProtectedRoute routeName="nurses-management"><NursesManagement /></ProtectedRoute> : <Navigate to="/login" replace />} />
-              <Route path="/teleconsultation" element={isAuthed ? <ProtectedRoute routeName="teleconsultation"><Teleconsultation /></ProtectedRoute> : <Navigate to="/login" replace />} />
-              <Route path="/referrals" element={isAuthed ? <ProtectedRoute routeName="referral-system"><ReferralSystem /></ProtectedRoute> : <Navigate to="/login" replace />} />
+              <Route
+                path="/"
+                element={
+                  isAuthed ? (
+                    <ProtectedRoute routeName="dashboard">
+                      <Dashboard />
+                    </ProtectedRoute>
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+              <Route
+                path="/patients"
+                element={
+                  isAuthed ? (
+                    <ProtectedRoute routeName="patient-management">
+                      <PatientManagement />
+                    </ProtectedRoute>
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+              <Route
+                path="/doctors"
+                element={
+                  isAuthed ? (
+                    <ProtectedRoute routeName="doctors-management">
+                      <DoctorsManagement />
+                    </ProtectedRoute>
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+              <Route
+                path="/nurses"
+                element={
+                  isAuthed ? (
+                    <ProtectedRoute routeName="nurses-management">
+                      <NursesManagement />
+                    </ProtectedRoute>
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+              <Route
+                path="/teleconsultation"
+                element={
+                  isAuthed ? (
+                    <ProtectedRoute routeName="teleconsultation">
+                      <Teleconsultation />
+                    </ProtectedRoute>
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+              <Route
+                path="/referrals"
+                element={
+                  isAuthed ? (
+                    <ProtectedRoute routeName="referral-system">
+                      <ReferralSystem />
+                    </ProtectedRoute>
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
               <Route path="/shared-referral/:code" element={<SharedReferral />} />
-              <Route path="/invoices" element={isAuthed ? <ProtectedRoute routeName="invoice-management"><Billing /></ProtectedRoute> : <Navigate to="/login" replace />} />
-              <Route path="/billing" element={isAuthed ? <ProtectedRoute routeName="invoice-management"><Billing /></ProtectedRoute> : <Navigate to="/login" replace />} />
-              <Route path="/community" element={isAuthed ? <ProtectedRoute routeName="community-hub"><CommunityHub /></ProtectedRoute> : <Navigate to="/login" replace />} />
-              <Route path="/email-settings" element={isAuthed ? <ProtectedRoute routeName="email-settings"><EmailSettings /></ProtectedRoute> : <Navigate to="/login" replace />} />
-              <Route path="/compliance" element={isAuthed ? <ProtectedRoute routeName="compliance-alerts"><Dashboard /></ProtectedRoute> : <Navigate to="/login" replace />} />
+              <Route
+                path="/invoices"
+                element={
+                  isAuthed ? (
+                    <ProtectedRoute routeName="invoice-management">
+                      <Billing />
+                    </ProtectedRoute>
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+              <Route
+                path="/billing"
+                element={
+                  isAuthed ? (
+                    <ProtectedRoute routeName="invoice-management">
+                      <Billing />
+                    </ProtectedRoute>
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+              <Route
+                path="/community"
+                element={
+                  isAuthed ? (
+                    <ProtectedRoute routeName="community-hub">
+                      <CommunityHub />
+                    </ProtectedRoute>
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+              <Route
+                path="/email-settings"
+                element={
+                  isAuthed ? (
+                    <ProtectedRoute routeName="email-settings">
+                      <EmailSettings />
+                    </ProtectedRoute>
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
+              <Route
+                path="/compliance"
+                element={
+                  isAuthed ? (
+                    <ProtectedRoute routeName="compliance-alerts">
+                      <Dashboard />
+                    </ProtectedRoute>
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                }
+              />
               <Route path="/api-test" element={<APITest />} />
               <Route path="/logout" element={<Logout />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>
