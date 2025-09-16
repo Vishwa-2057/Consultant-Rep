@@ -3,7 +3,7 @@ const { body, validationResult } = require('express-validator');
 const Referral = require('../models/Referral');
 const Patient = require('../models/Patient');
 const emailService = require('../services/emailService');
-const auth = require('../middleware/auth');
+const { auth, authorize } = require('../middleware/auth');
 const router = express.Router();
 
 // Validation middleware
