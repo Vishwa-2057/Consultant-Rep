@@ -16,7 +16,7 @@ app.get("/", (req, res) => {
 });
 
 // Import routes
-const usersRoutes = require("./routes/users"); // ✅ Added users route
+const usersRoutes = require("./routes/users"); 
 const patientRoutes = require("./routes/patients");
 const appointmentRoutes = require("./routes/appointments");
 const consultationRoutes = require("./routes/consultations");
@@ -47,8 +47,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      // allow requests with no origin (mobile apps, curl)
-      if (!origin) return callback(null, true);
+      if (!origin) return callback(null, true); // allow requests with no origin
       if (allowedOrigins.includes(origin)) return callback(null, true);
       console.log("❌ CORS blocked origin:", origin);
       return callback(new Error("Not allowed by CORS"));
@@ -83,7 +82,7 @@ app.get("/health", (req, res) => {
 });
 
 // ✅ API routes
-app.use("/api/users", usersRoutes); // ✅ Mount users route
+app.use("/api/users", usersRoutes);
 app.use("/api/patients", patientRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/consultations", consultationRoutes);
