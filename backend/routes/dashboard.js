@@ -6,7 +6,7 @@ const Appointment = require('../models/Appointment');
 const Consultation = require('../models/Consultation');
 const Invoice = require('../models/Invoice');
 const Referral = require('../models/Referral');
-const { auth } = require('../middleware/auth');
+const { auth, authorize } = require('../middleware/auth');
 
 // @route   GET /api/dashboard/overview
 // @desc    Get dashboard overview statistics
