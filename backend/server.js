@@ -75,6 +75,11 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
+app.use(cors({
+  origin: ["http://localhost:5173", "https://ornate-kringle-eda7fb.netlify.app/login"],
+  credentials: true
+}));
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
