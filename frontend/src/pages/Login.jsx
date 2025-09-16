@@ -33,12 +33,13 @@ const Login = () => {
         res = await authAPI.login({ email: email.trim(), password });
       }
 
-const token = res.data.token || res.data.accessToken;
-authAPI.setToken(token);
+      // ✅ Fix: read token and user directly from res
+      const token = res.token || res.accessToken;
+      authAPI.setToken(token);
 
       localStorage.setItem(
         "authUser",
-        JSON.stringify(res.data.user || res.data.doctor || {})
+        JSON.stringify(res.user || res.doctor || {})
       );
       window.dispatchEvent(new Event("auth-changed"));
       navigate("/");
@@ -75,10 +76,14 @@ authAPI.setToken(token);
     setLoading(true);
     try {
       const res = await authAPI.loginWithOTP({ email: email.trim(), otp });
-      authAPI.setToken(res.data.token);
+
+      // ✅ Fix: read token and user directly from res
+      const token = res.token || res.accessToken;
+      authAPI.setToken(token);
+
       localStorage.setItem(
         "authUser",
-        JSON.stringify(res.data.user || res.data.doctor || {})
+        JSON.stringify(res.user || res.doctor || {})
       );
       window.dispatchEvent(new Event("auth-changed"));
       navigate("/");
