@@ -1,7 +1,6 @@
 const express = require('express');
 const User = require('../models/User');
 const { auth, authorize } = require('../middleware/auth');
-
 const router = express.Router();
 
 // Get all users (admin only)
@@ -9,8 +8,9 @@ router.get('/', auth, authorize('super_master_admin', 'super_admin'), async (req
   try {
     const { role, clinicId } = req.query;
     const filter = {};
-    
+
     if (role) filter.role = role;
+
     if (req.user.role === 'super_admin' && req.user.clinicId) {
       filter.clinicId = req.user.clinicId;
     } else if (clinicId) {
@@ -49,14 +49,19 @@ router.get('/:id', auth, async (req, res) => {
 router.put('/:id', auth, async (req, res) => {
   try {
     const { firstName, lastName, phone, specialization, licenseNumber, isActive } = req.body;
-    
+
     const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Check permissions
-    if (req.user.role === 'super_admin' && user.clinicId.toString() !== req.user.clinicId.toString()) {
+    // Check permissions: super_admin can update only users in their clinic
+    if (
+      req.user.role === 'super_admin' &&
+      user.clinicId &&
+      req.user.clinicId &&
+      user.clinicId.toString() !== req.user.clinicId.toString()
+    ) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
@@ -64,7 +69,9 @@ router.put('/:id', auth, async (req, res) => {
       req.params.id,
       { firstName, lastName, phone, specialization, licenseNumber, isActive },
       { new: true, runValidators: true }
-    ).populate('clinicId', 'name').select('-password -otp -otpExpires');
+    )
+      .populate('clinicId', 'name')
+      .select('-password -otp -otpExpires');
 
     res.json({ success: true, message: 'User updated successfully', user: updatedUser });
   } catch (error) {
@@ -80,8 +87,13 @@ router.delete('/:id', auth, authorize('super_master_admin', 'super_admin'), asyn
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Check permissions
-    if (req.user.role === 'super_admin' && user.clinicId.toString() !== req.user.clinicId.toString()) {
+    // Check permissions: super_admin can delete only users in their clinic
+    if (
+      req.user.role === 'super_admin' &&
+      user.clinicId &&
+      req.user.clinicId &&
+      user.clinicId.toString() !== req.user.clinicId.toString()
+    ) {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
