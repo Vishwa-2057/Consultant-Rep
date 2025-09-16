@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Patient = require('../models/Patient');
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth'); // Destructure auth here
 const router = express.Router();
 
 // Validation middleware
@@ -143,7 +143,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 // POST /api/patients - Create new patient
-router.post('/', auth, validatePatient, async (req, res) => {
+router.post('/', auth, ...validatePatient, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -175,7 +175,7 @@ router.post('/', auth, validatePatient, async (req, res) => {
 });
 
 // PUT /api/patients/:id - Update patient
-router.put('/:id', auth, validatePatient, async (req, res) => {
+router.put('/:id', auth, ...validatePatient, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
