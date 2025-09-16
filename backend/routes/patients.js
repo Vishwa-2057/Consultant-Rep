@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const Patient = require('../models/Patient');
-const { auth } = require('../middleware/auth'); // Destructure auth here
+const { auth, authorize } = require('../middleware/auth');
 const router = express.Router();
 
 // Validation middleware
