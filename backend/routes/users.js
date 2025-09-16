@@ -16,19 +16,19 @@ app.get("/", (req, res) => {
 });
 
 // Import routes
-const patientRoutes = require("./routes/patients");
-const appointmentRoutes = require("./routes/appointments");
-const consultationRoutes = require("./routes/consultations");
-const referralRoutes = require("./routes/referrals");
-const invoiceRoutes = require("./routes/invoices");
-const postRoutes = require("./routes/posts");
-const authRoutes = require("./routes/auth");
-const complianceAlertRoutes = require("./routes/complianceAlerts");
-const otpRoutes = require("./routes/otp");
-const emailConfigRoutes = require("./routes/emailConfig");
-const doctorRoutes = require("./routes/doctors");
-const nurseRoutes = require("./routes/nurses");
-const superAdminRoutes = require("./routes/superadmin");
+const patientRoutes = require("./patients");
+const appointmentRoutes = require("./appointments");
+const consultationRoutes = require("./consultations");
+const referralRoutes = require("./referrals");
+const invoiceRoutes = require("./invoices");
+const postRoutes = require("./posts");
+const authRoutes = require("./auth");
+const complianceAlertRoutes = require("./complianceAlerts");
+const otpRoutes = require("./otp");
+const emailConfigRoutes = require("./emailConfig");
+const doctorRoutes = require("./doctors");
+const nurseRoutes = require("./nurses");
+const superAdminRoutes = require("./superadmin");
 
 // Middleware
 app.use(helmet());
