@@ -1,5 +1,16 @@
 const jwt = require('jsonwebtoken');
 
+const API_BASE = import.meta.env.VITE_API_URL;
+
+async function login(data) {
+  const res = await fetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
 // Simple auth middleware for testing
 const auth = (req, res, next) => {
   try {
